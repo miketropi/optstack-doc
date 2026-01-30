@@ -1,0 +1,153 @@
+# Quickstart
+
+Get up and running with OptStack in minutes.
+
+## Installation
+
+### Option 1: As a WordPress Plugin
+
+Download and install OptStack as a standalone plugin:
+
+```bash
+# Clone or download to wp-content/plugins/
+cd wp-content/plugins/
+git clone https://github.com/miketropi/optstack.git
+```
+
+Then activate the plugin from the WordPress admin dashboard.
+
+### Option 2: As a Composer Library
+
+Use OptStack as a dependency in your own plugins or themes:
+
+```bash
+composer require optstack/optstack
+```
+
+Bootstrap with runtime context injection in your theme's `functions.php` or plugin file:
+
+```php
+$autoloader = get_template_directory() . '/vendor/autoload.php';
+
+if (file_exists($autoloader)) {
+    require_once $autoloader;
+}
+
+/**
+ * Initialize OptStack.
+ */
+function theme_init(): void
+{
+    \OptStack\WordPress\Bootstrap::boot([
+        'version' => wp_get_theme()->get('Version'),
+    ]);
+}
+add_action('after_setup_theme', 'theme_init');
+
+// Register theme options with OptStack
+require_once get_template_directory() . '/theme-options.php';
+```
+
+## Basic Usage
+
+### Create Your Options File
+
+Create a new file `theme-options.php` in your theme directory. You can use our comprehensive example as a starting point:
+
+**[View full example on GitHub →](https://github.com/miketropi/optstack/blob/master/examples/exam2.php)**
+
+Here's a simplified version to get started:
+
+```php
+<?php
+/**
+ * Theme Options with OptStack
+ */
+
+declare(strict_types=1);
+
+use OptStack\OptStack;
+
+// Prevent direct access
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+add_action('optstack_init', function () {
+    OptStack::make('theme_options')
+        ->forOptions()
+        ->menuParent('themes.php')
+        ->menuIcon('dashicons-admin-appearance')
+        ->label('Theme Options')
+        ->description('Customize your theme appearance')
+        ->define(function ($stack) {
+            
+            // General Settings Tab
+            $stack->tab('general', function ($tab) {
+                $tab->group('identity', function ($group) {
+                    $group->field('site_logo', [
+                        'type' => 'media',
+                        'label' => 'Site Logo',
+                        'attributes' => [
+                            'allowedTypes' => ['image'],
+                        ],
+                    ]);
+                    
+                    $group->field('site_tagline', [
+                        'type' => 'text',
+                        'label' => 'Site Tagline',
+                    ]);
+                }, [
+                    'label' => 'Site Identity',
+                    'layout' => 'box',
+                ]);
+            }, [
+                'label' => 'General',
+            ]);
+            
+        })
+        ->build();
+});
+```
+
+### Include in Your Theme
+
+Add this line to your theme's `functions.php` after the OptStack bootstrap:
+
+```php
+require_once get_template_directory() . '/theme-options.php';
+```
+
+### Access Your Options
+
+```php
+// Get all theme options
+$options = get_option('theme_options', []);
+
+// Get a specific option with dot notation
+function mytheme_option(string $key, mixed $default = null): mixed
+{
+    $options = get_option('theme_options', []);
+    $keys = explode('.', $key);
+    $value = $options;
+    
+    foreach ($keys as $k) {
+        if (!isset($value[$k])) {
+            return $default;
+        }
+        $value = $value[$k];
+    }
+    
+    return $value;
+}
+
+// Usage examples
+$logo = mytheme_option('general.identity.site_logo');
+$tagline = mytheme_option('general.identity.site_tagline', 'Default tagline');
+```
+
+## Next Steps
+
+- [Field Types](/fields) — Explore all available field types
+- [Stores](/stores) — Learn about Options, Post Meta, Term Meta, and User Meta stores
+- [Advanced Usage](/advanced) — Conditional logic, validation, and more

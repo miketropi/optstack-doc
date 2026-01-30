@@ -1,0 +1,59 @@
+# Introduction OptStack
+
+> **WordPress Data Stack Framework** — A PHP framework for defining, storing, and managing structured data in WordPress using a unified, extensible stack-based model.
+
+## Features
+
+- **Data-first, UI-agnostic** — Focus on data modeling, not UI
+- **Native WordPress compatibility** — Works with `get_option()`, `get_post_meta()`, `get_term_meta()`
+- **Unified data model** — Same field syntax across Options, Posts, Terms, Users
+- **Quick field updates** — Update single fields with automatic searchable field sync
+- **Runtime context injection** — Use as plugin or Composer library, no conflicts
+- **Composable & extensible** — Interface-driven architecture
+- **Future-proof** — Ready for Headless WordPress and REST workflows
+- **Modern Admin UI** — React + TypeScript + TailwindCSS frontend
+
+## Requirements
+
+- PHP 8.1+
+- WordPress 6.0+
+- Node.js 18+ (for frontend development)
+
+## Architecture
+
+```
+┌─────────────────────────────────────────┐
+│           Renderers (UI/API)            │  ← React Admin, REST
+├─────────────────────────────────────────┤
+│         Store Adapters (WP)             │  ← OptionsStore, PostStore
+├─────────────────────────────────────────┤
+│           Core Framework                │  ← Pure PHP, no WP
+└─────────────────────────────────────────┘
+```
+
+- **Core** — Pure PHP, no WordPress dependencies, fully unit testable
+- **WordPress** — Store adapters and hooks
+- **Frontend** — React + TypeScript admin UI
+
+## Directory Structure
+
+```
+optstack/
+├── src/
+│   ├── Core/           # Pure PHP framework
+│   ├── WordPress/      # WP integration
+│   ├── Schema/         # Schema export
+│   └── OptStack.php    # Main facade
+├── frontend/
+│   ├── src/            # React/TypeScript source
+│   ├── dist/           # Built assets
+│   └── vite.config.ts  # Build configuration
+├── examples/           # Usage examples
+├── tests/              # PHPUnit tests
+└── optstack.php        # Plugin bootstrap
+```
+
+## License
+
+MIT License
+
