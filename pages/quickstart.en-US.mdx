@@ -1,3 +1,7 @@
+---
+title: Quickstart
+---
+
 # Quickstart
 
 Get up and running with OptStack in minutes.
@@ -26,7 +30,7 @@ composer require optstack/optstack
 
 Bootstrap with runtime context injection in your theme's `functions.php` or plugin file:
 
-```php
+```php filename="funtions.php" showLineNumbers /App/ {10-17}
 $autoloader = get_template_directory() . '/vendor/autoload.php';
 
 if (file_exists($autoloader)) {
@@ -42,9 +46,10 @@ function theme_init(): void
         'version' => wp_get_theme()->get('Version'),
     ]);
 }
-add_action('after_setup_theme', 'theme_init');
 
-// Register theme options with OptStack
+theme_init();
+
+// Include theme options example
 require_once get_template_directory() . '/theme-options.php';
 ```
 
@@ -58,7 +63,7 @@ Create a new file `theme-options.php` in your theme directory. You can use our c
 
 Here's a simplified version to get started:
 
-```php
+```php filename="theme-options.php"
 <?php
 /**
  * Theme Options with OptStack

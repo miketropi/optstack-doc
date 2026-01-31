@@ -1,0 +1,166 @@
+---
+title: Quickstart
+---
+
+# Bắt đầu nhanh (Quickstart)
+
+Khởi động và chạy OptStack chỉ trong vài phút.
+
+## Cài đặt
+
+### Cách 1: Dùng như một WordPress Plugin
+
+Tải về và cài đặt OptStack như một plugin độc lập:
+
+```bash
+# Clone hoặc tải về thư mục wp-content/plugins/
+cd wp-content/plugins/
+git clone https://github.com/miketropi/optstack.git
+```
+
+Sau đó kích hoạt plugin từ trang quản trị WordPress.
+
+### Cách 2: Dùng như một thư viện Composer
+
+Sử dụng OptStack như một dependency trong plugin hoặc theme của bạn:
+
+```bash
+composer require optstack/optstack
+```
+
+Khởi tạo (bootstrap) với cơ chế inject context lúc runtime trong file `functions.php` của theme hoặc file plugin:
+
+```php filename="funtions.php" showLineNumbers /App/ {10-17}
+$autoloader = get_template_directory() . '/vendor/autoload.php';
+
+if (file_exists($autoloader)) {
+    require_once $autoloader;
+}
+
+/**
+ * Khởi tạo OptStack.
+ */
+function theme_init(): void
+{
+    \OptStack\WordPress\Bootstrap::boot([
+        'version' => wp_get_theme()->get('Version'),
+    ]);
+}
+
+theme_init();
+
+// Include ví dụ theme options
+require_once get_template_directory() . '/theme-options.php';
+```
+
+---
+
+## Sử dụng cơ bản
+
+### Tạo file Options cho theme
+
+Tạo file mới `theme-options.php` trong thư mục theme. Bạn có thể dùng ví dụ đầy đủ làm điểm bắt đầu:
+
+**[Xem ví dụ đầy đủ trên GitHub →](https://github.com/miketropi/optstack/blob/master/examples/exam2.php)**
+
+Dưới đây là phiên bản rút gọn để bắt đầu nhanh:
+
+```php filename="theme-options.php"
+<?php
+/**
+ * Theme Options với OptStack
+ */
+
+declare(strict_types=1);
+
+use OptStack\OptStack;
+
+// Chặn truy cập trực tiếp
+if (!defined('ABSPATH')) {
+    exit;
+}
+
+add_action('optstack_init', function () {
+    OptStack::make('theme_options')
+        ->forOptions()
+        ->menuParent('themes.php')
+        ->menuIcon('dashicons-admin-appearance')
+        ->label('Theme Options')
+        ->description('Tùy chỉnh giao diện theme')
+        ->define(function ($stack) {
+            
+            // Tab cài đặt chung
+            $stack->tab('general', function ($tab) {
+                $tab->group('identity', function ($group) {
+                    $group->field('site_logo', [
+                        'type' => 'media',
+                        'label' => 'Logo website',
+                        'attributes' => [
+                            'allowedTypes' => ['image'],
+                        ],
+                    ]);
+                    
+                    $group->field('site_tagline', [
+                        'type' => 'text',
+                        'label' => 'Khẩu hiệu (tagline)',
+                    ]);
+                }, [
+                    'label' => 'Nhận diện website',
+                    'layout' => 'box',
+                ]);
+            }, [
+                'label' => 'Chung',
+            ]);
+            
+        })
+        ->build();
+});
+```
+
+---
+
+### Include vào theme
+
+Thêm dòng sau vào `functions.php` của theme, sau phần bootstrap OptStack:
+
+```php
+require_once get_template_directory() . '/theme-options.php';
+```
+
+---
+
+### Lấy (access) dữ liệu options
+
+```php
+// Lấy toàn bộ theme options
+$options = get_option('theme_options', []);
+
+// Lấy một option cụ thể bằng dot notation
+function mytheme_option(string $key, mixed $default = null): mixed
+{
+    $options = get_option('theme_options', []);
+    $keys = explode('.', $key);
+    $value = $options;
+    
+    foreach ($keys as $k) {
+        if (!isset($value[$k])) {
+            return $default;
+        }
+        $value = $value[$k];
+    }
+    
+    return $value;
+}
+
+// Ví dụ sử dụng
+$logo = mytheme_option('general.identity.site_logo');
+$tagline = mytheme_option('general.identity.site_tagline', 'Tagline mặc định');
+```
+
+---
+
+## Bước tiếp theo
+
+* **Field Types** (/fields) — Khám phá các loại field có sẵn
+* **Stores** (/stores) — Tìm hiểu về Options, Post Meta, Term Meta và User Meta
+* **Advanced Usage** (/advanced) — Logic điều kiện, validation và nhiều hơn nữa

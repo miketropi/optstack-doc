@@ -1,0 +1,63 @@
+---
+title: Giới thiệu OptStack
+description: WordPress Data Stack Framework — Một framework PHP để định nghĩa, lưu trữ và quản lý dữ liệu có cấu trúc trong WordPress bằng mô hình stack thống nhất và có thể mở rộng.
+---
+
+# Giới thiệu OptStack
+
+> **WordPress Data Stack Framework** — Một framework PHP để định nghĩa, lưu trữ và quản lý dữ liệu có cấu trúc trong WordPress bằng mô hình stack thống nhất và có thể mở rộng.
+
+## Tính năng
+
+* **Ưu tiên dữ liệu, không phụ thuộc UI** — Tập trung vào mô hình dữ liệu, không phải giao diện
+* **Tương thích WordPress gốc** — Hoạt động với `get_option()`, `get_post_meta()`, `get_term_meta()`
+* **Mô hình dữ liệu thống nhất** — Cùng một cú pháp field cho Options, Posts, Terms, Users
+* **Cập nhật field nhanh** — Cập nhật từng field đơn lẻ với cơ chế tự đồng bộ field tìm kiếm
+* **Inject context lúc runtime** — Dùng như plugin hoặc thư viện Composer, không xung đột
+* **Có thể kết hợp & mở rộng** — Kiến trúc dựa trên interface
+* **Hướng đến tương lai** — Sẵn sàng cho Headless WordPress và REST workflow
+* **Admin UI hiện đại** — Frontend React + TypeScript + TailwindCSS
+
+## Yêu cầu
+
+* PHP 8.1+
+* WordPress 6.0+
+* Node.js 18+ (cho phát triển frontend)
+
+## Kiến trúc
+
+```
+┌─────────────────────────────────────────┐
+│           Renderers (UI/API)            │  ← React Admin, REST
+├─────────────────────────────────────────┤
+│         Store Adapters (WP)             │  ← OptionsStore, PostStore
+├─────────────────────────────────────────┤
+│           Core Framework                │  ← Pure PHP, không WP
+└─────────────────────────────────────────┘
+```
+
+* **Core** — PHP thuần, không phụ thuộc WordPress, có thể unit test đầy đủ
+* **WordPress** — Store adapters và hooks
+* **Frontend** — Admin UI dùng React + TypeScript
+
+## Cấu trúc thư mục
+
+```
+optstack/
+├── src/
+│   ├── Core/           # Framework PHP thuần
+│   ├── WordPress/      # Tích hợp WP
+│   ├── Schema/         # Xuất schema
+│   └── OptStack.php    # Facade chính
+├── frontend/
+│   ├── src/            # Source React/TypeScript
+│   ├── dist/           # Tài nguyên đã build
+│   └── vite.config.ts  # Cấu hình build
+├── examples/           # Ví dụ sử dụng
+├── tests/              # Test PHPUnit
+└── optstack.php        # Bootstrap plugin
+```
+
+## Giấy phép
+
+Giấy phép MIT

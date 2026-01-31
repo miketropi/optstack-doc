@@ -1,0 +1,16 @@
+{
+  "index": "Introduction",
+  "quickstart": "Quick Start",
+  "another": "Another Page",
+  "advanced": "Advanced (A Folder)",
+  "about": {
+    "title": "About",
+    "type": "page"
+  },
+  "contact": {
+    "title": "Contact ↗",
+    "type": "page",
+    "href": "mailto:mike.beplus@gmail.com?subject=Optstack documentation&body=I have a question about the documentation",
+    "newWindow": true
+  }
+}
