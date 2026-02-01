@@ -1,8 +1,7 @@
 {
   "index": "Introduction",
   "quickstart": "Quick Start",
-  "another": "Another Page",
-  "advanced": "Advanced (A Folder)",
+  "fields": "Fields",
   "about": {
     "title": "About",
     "type": "page"

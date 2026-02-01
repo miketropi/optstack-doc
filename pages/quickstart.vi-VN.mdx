@@ -129,38 +129,43 @@ require_once get_template_directory() . '/theme-options.php';
 
 ---
 
-### Lấy (access) dữ liệu options
+### Truy xuất dữ liệu Options
+
+Sử dụng `OptStack::getField()` để lấy giá trị field với hỗ trợ dot notation:
 
 ```php
-// Lấy toàn bộ theme options
-$options = get_option('theme_options', []);
+use OptStack\OptStack;
 
-// Lấy một option cụ thể bằng dot notation
-function mytheme_option(string $key, mixed $default = null): mixed
-{
-    $options = get_option('theme_options', []);
-    $keys = explode('.', $key);
-    $value = $options;
-    
-    foreach ($keys as $k) {
-        if (!isset($value[$k])) {
-            return $default;
-        }
-        $value = $value[$k];
-    }
-    
-    return $value;
-}
+// Cú pháp cơ bản
+OptStack::getField(
+    string $stackId,    // Định danh Stack
+    string $key,        // Key của field (hỗ trợ dot notation)
+    mixed $default,     // Giá trị mặc định nếu không tìm thấy
+    ?int $objectId      // Object ID (cho post/term/user contexts)
+);
 
-// Ví dụ sử dụng
-$logo = mytheme_option('general.identity.site_logo');
-$tagline = mytheme_option('general.identity.site_tagline', 'Tagline mặc định');
+// Lấy field đơn giản
+$tagline = OptStack::getField('theme_options', 'site_tagline', 'Tagline mặc định');
+
+// Lấy field lồng nhau trong group (dot notation)
+$logo = OptStack::getField('theme_options', 'identity.site_logo', '');
+$primary_color = OptStack::getField('theme_options', 'colors.primary', '#3b82f6');
+
+// Cập nhật giá trị field
+OptStack::updateField('theme_options', 'identity.site_tagline', 'Tagline mới');
 ```
 
----
+#### Cách khác: Dùng hàm WordPress trực tiếp
 
-## Bước tiếp theo
+Bạn cũng có thể sử dụng các hàm native của WordPress:
 
-* **Field Types** (/fields) — Khám phá các loại field có sẵn
-* **Stores** (/stores) — Tìm hiểu về Options, Post Meta, Term Meta và User Meta
-* **Advanced Usage** (/advanced) — Logic điều kiện, validation và nhiều hơn nữa
+```php
+// Lấy toàn bộ options
+$options = get_option('theme_options', []);
+
+// Truy cập giá trị lồng nhau thủ công
+$logo = $options['identity']['site_logo'] ?? '';
+```
+
+Để biết thêm chi tiết về cách lấy giá trị field, xem [Hướng dẫn sử dụng Field](/fields/usage#retrieving-field-values).
+

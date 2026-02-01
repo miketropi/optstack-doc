@@ -125,34 +125,40 @@ require_once get_template_directory() . '/theme-options.php';
 
 ### Access Your Options
 
+Use `OptStack::getField()` to retrieve field values with dot notation support:
+
 ```php
-// Get all theme options
-$options = get_option('theme_options', []);
+use OptStack\OptStack;
 
-// Get a specific option with dot notation
-function mytheme_option(string $key, mixed $default = null): mixed
-{
-    $options = get_option('theme_options', []);
-    $keys = explode('.', $key);
-    $value = $options;
-    
-    foreach ($keys as $k) {
-        if (!isset($value[$k])) {
-            return $default;
-        }
-        $value = $value[$k];
-    }
-    
-    return $value;
-}
+// Basic syntax
+OptStack::getField(
+    string $stackId,    // Stack identifier
+    string $key,        // Field key (supports dot notation)
+    mixed $default,     // Default value if not found
+    ?int $objectId      // Object ID (for post/term/user contexts)
+);
 
-// Usage examples
-$logo = mytheme_option('general.identity.site_logo');
-$tagline = mytheme_option('general.identity.site_tagline', 'Default tagline');
+// Get simple field
+$tagline = OptStack::getField('theme_options', 'site_tagline', 'Default tagline');
+
+// Get nested field in a group (dot notation)
+$logo = OptStack::getField('theme_options', 'identity.site_logo', '');
+$primary_color = OptStack::getField('theme_options', 'colors.primary', '#3b82f6');
+
+// Update a field value
+OptStack::updateField('theme_options', 'identity.site_tagline', 'New Tagline');
 ```
 
-## Next Steps
+#### Alternative: Direct WordPress Functions
 
-- [Field Types](/fields) — Explore all available field types
-- [Stores](/stores) — Learn about Options, Post Meta, Term Meta, and User Meta stores
-- [Advanced Usage](/advanced) — Conditional logic, validation, and more
+You can also use native WordPress functions:
+
+```php
+// Get all options
+$options = get_option('theme_options', []);
+
+// Access nested values manually
+$logo = $options['identity']['site_logo'] ?? '';
+```
+
+For more details on retrieving field values, see the [Field Usage Guide](/fields/usage#retrieving-field-values).
