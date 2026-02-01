@@ -1,0 +1,435 @@
+---
+title: TermStore
+---
+
+# TermStore
+
+Stores data in the `wp_termmeta` table. Used for custom fields on taxonomy terms (categories, tags, custom taxonomies).
+
+---
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **WordPress Table** | `wp_termmeta` |
+| **WordPress Function** | `get_term_meta()` / `update_term_meta()` |
+| **Use Case** | Category settings, tag metadata, custom taxonomy fields |
+| **Object ID Required** | Yes (`$term_id`) |
+
+---
+
+## Stack Definition
+
+```php
+OptStack::make('category_settings')
+    ->forTaxonomy('category')
+    ->label('Category Settings')
+    ->define(function ($stack) {
+        $stack->field('icon', ['type' => 'media', 'label' => 'Category Icon']);
+        $stack->field('color', ['type' => 'color', 'label' => 'Category Color']);
+        
+        $stack->group('display', function ($group) {
+            $group->field('layout', [
+                'type' => 'select',
+                'label' => 'Layout',
+                'options' => [
+                    ['value' => 'grid', 'label' => 'Grid'],
+                    ['value' => 'list', 'label' => 'List'],
+                ],
+            ]);
+            $group->field('posts_per_page', ['type' => 'number', 'label' => 'Posts Per Page']);
+        }, ['label' => 'Display Settings']);
+    })
+    ->build();
+```
+
+### Multiple Taxonomies
+
+```php
+OptStack::make('taxonomy_settings')
+    ->forTaxonomy(['category', 'post_tag', 'product_cat'])
+    ->label('Taxonomy Settings')
+    ->define(function ($stack) {
+        // ...
+    })
+    ->build();
+```
+
+---
+
+## How Data is Stored
+
+```sql
+-- In wp_termmeta table
+term_id: 5
+meta_key: category_settings
+meta_value: a:3:{s:4:"icon";i:456;s:5:"color";s:7:"#10b981";s:7:"display";a:2:{s:6:"layout";s:4:"grid";s:14:"posts_per_page";i:12;}}
+```
+
+**Unserialized Data:**
+
+```php
+[
+    'icon' => 456,
+    'color' => '#10b981',
+    'display' => [
+        'layout' => 'grid',
+        'posts_per_page' => 12,
+    ]
+]
+```
+
+---
+
+## Constructor
+
+```php
+new TermStore(int $termId, string $metaKey)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$termId` | int | The WordPress term ID |
+| `$metaKey` | string | The meta key (stack ID) |
+
+---
+
+## Methods
+
+### Inherited from StoreInterface
+
+```php
+$store->get(string $key, mixed $default = null): mixed
+$store->set(string $key, mixed $value): bool
+$store->delete(string $key): bool
+$store->all(): array
+$store->has(string $key): bool
+$store->setMany(array $values): bool
+$store->replace(array $data): bool
+$store->deleteAll(): bool
+$store->clearCache(): void
+```
+
+### Unique Methods
+
+```php
+// Get the term ID
+$store->getTermId(): int
+
+// Set the term ID (for reusing store instance)
+$store->setTermId(int $termId): self
+
+// Get the meta key
+$store->getMetaKey(): string
+```
+
+---
+
+## Retrieving Data
+
+### Using OptStack Facade (Recommended)
+
+```php
+use OptStack\OptStack;
+
+// Get simple field (requires term ID)
+$icon = OptStack::getField('category_settings', 'icon', '', $term_id);
+
+// Get nested field (dot notation)
+$layout = OptStack::getField('category_settings', 'display.layout', 'grid', $term_id);
+
+// Get all data
+$categoryData = OptStack::getData('category_settings', $term_id);
+```
+
+### In Category Archive
+
+```php
+// In category.php or archive.php
+$term = get_queried_object();
+$term_id = $term->term_id;
+
+$icon = OptStack::getField('category_settings', 'icon', '', $term_id);
+$color = OptStack::getField('category_settings', 'color', '#000000', $term_id);
+$layout = OptStack::getField('category_settings', 'display.layout', 'grid', $term_id);
+```
+
+### Using WordPress Functions
+
+```php
+// Get all term meta
+$data = get_term_meta($term_id, 'category_settings', true);
+
+// Access specific field
+$icon = $data['icon'] ?? '';
+
+// Access nested field
+$layout = $data['display']['layout'] ?? 'grid';
+```
+
+### Direct Store Access
+
+```php
+use OptStack\WordPress\Store\TermStore;
+
+$store = new TermStore($term_id, 'category_settings');
+
+// Get value
+$color = $store->get('color', '#000000');
+
+// Get all data
+$allData = $store->all();
+
+// Check if exists
+if ($store->has('icon')) {
+    // ...
+}
+```
+
+---
+
+## Updating Data
+
+### Using OptStack Facade (Recommended)
+
+```php
+use OptStack\OptStack;
+
+// Update single field
+OptStack::updateField('category_settings', 'color', '#3b82f6', $term_id);
+
+// Update nested field
+OptStack::updateField('category_settings', 'display.layout', 'list', $term_id);
+
+// Save multiple fields
+OptStack::saveData('category_settings', [
+    'icon' => 789,
+    'color' => '#3b82f6',
+], $term_id);
+```
+
+### Direct Store Access
+
+```php
+$store = new TermStore($term_id, 'category_settings');
+
+// Set single value
+$store->set('color', '#3b82f6');
+
+// Set multiple values (efficient)
+$store->setMany([
+    'icon' => 789,
+    'color' => '#3b82f6',
+]);
+```
+
+---
+
+## Automatic Store Binding
+
+TermStore is automatically bound in these scenarios:
+
+### 1. REST API with object_id
+
+```
+GET /wp-json/optstack/v1/stacks/category_settings?object_id=5
+```
+
+### 2. Using OptStack::getField() with term ID
+
+```php
+// The $term_id triggers automatic TermStore binding
+$icon = OptStack::getField('category_settings', 'icon', '', $term_id);
+```
+
+### 3. During Term Hooks
+
+When creating or editing a term in the admin, OptStack automatically binds the TermStore via `created_term` and `edited_term` hooks.
+
+---
+
+## Complete Example
+
+### Category Settings
+
+```php
+<?php
+use OptStack\OptStack;
+
+add_action('optstack_init', function () {
+    OptStack::make('category_settings')
+        ->forTaxonomy('category')
+        ->label('Category Settings')
+        ->define(function ($stack) {
+            
+            // Visual Settings
+            $stack->group('visual', function ($group) {
+                $group->field('icon', [
+                    'type' => 'media',
+                    'label' => 'Category Icon',
+                    'attributes' => ['allowedTypes' => ['image']],
+                ]);
+                $group->field('header_image', [
+                    'type' => 'media',
+                    'label' => 'Header Image',
+                    'description' => 'Displayed at the top of category archive',
+                ]);
+                $group->field('color', [
+                    'type' => 'color',
+                    'label' => 'Category Color',
+                    'default' => '#3b82f6',
+                ]);
+            }, ['label' => 'Visual Settings', 'layout' => 'box']);
+            
+            // Display Settings
+            $stack->group('display', function ($group) {
+                $group->field('layout', [
+                    'type' => 'select',
+                    'label' => 'Archive Layout',
+                    'default' => 'grid',
+                    'options' => [
+                        ['value' => 'grid', 'label' => 'Grid'],
+                        ['value' => 'list', 'label' => 'List'],
+                        ['value' => 'masonry', 'label' => 'Masonry'],
+                    ],
+                ]);
+                $group->field('columns', [
+                    'type' => 'select',
+                    'label' => 'Columns',
+                    'default' => '3',
+                    'options' => [
+                        ['value' => '2', 'label' => '2 Columns'],
+                        ['value' => '3', 'label' => '3 Columns'],
+                        ['value' => '4', 'label' => '4 Columns'],
+                    ],
+                    'conditions' => [
+                        ['field' => 'layout', 'operator' => '!=', 'value' => 'list'],
+                    ],
+                ]);
+                $group->field('posts_per_page', [
+                    'type' => 'number',
+                    'label' => 'Posts Per Page',
+                    'default' => 12,
+                    'attributes' => ['min' => 1, 'max' => 100],
+                ]);
+            }, ['label' => 'Display Settings', 'layout' => 'box']);
+            
+            // SEO in Modal
+            $stack->group('seo', function ($group) {
+                $group->field('meta_title', ['type' => 'text', 'label' => 'Meta Title']);
+                $group->field('meta_description', ['type' => 'textarea', 'label' => 'Meta Description']);
+            }, [
+                'label' => 'SEO',
+                'deferred' => true,
+                'ui' => ['triggerLabel' => 'Edit SEO', 'render' => 'modal'],
+            ]);
+            
+        })
+        ->build();
+});
+```
+
+### Using in Category Template
+
+```php
+// category.php
+$term = get_queried_object();
+$term_id = $term->term_id;
+
+// Get visual settings
+$icon = OptStack::getField('category_settings', 'visual.icon', '', $term_id);
+$header_image = OptStack::getField('category_settings', 'visual.header_image', '', $term_id);
+$color = OptStack::getField('category_settings', 'visual.color', '#3b82f6', $term_id);
+
+// Get display settings
+$layout = OptStack::getField('category_settings', 'display.layout', 'grid', $term_id);
+$columns = OptStack::getField('category_settings', 'display.columns', '3', $term_id);
+
+// Display header
+if ($header_image) {
+    echo '<div class="category-header" style="background-image: url(' . esc_url(wp_get_attachment_url($header_image)) . ')">';
+}
+
+if ($icon) {
+    echo '<img src="' . esc_url(wp_get_attachment_url($icon)) . '" class="category-icon" alt="">';
+}
+
+echo '<h1 style="color: ' . esc_attr($color) . '">' . single_cat_title('', false) . '</h1>';
+
+// Set up grid classes
+$grid_class = "layout-{$layout} columns-{$columns}";
+echo '<div class="posts-container ' . esc_attr($grid_class) . '">';
+```
+
+### Helper Function
+
+```php
+/**
+ * Get category setting.
+ */
+function get_category_setting(string $key, mixed $default = null, ?int $term_id = null): mixed
+{
+    if (!$term_id) {
+        $term = get_queried_object();
+        $term_id = $term->term_id ?? 0;
+    }
+    return OptStack::getField('category_settings', $key, $default, $term_id);
+}
+
+// Usage
+$layout = get_category_setting('display.layout', 'grid');
+$color = get_category_setting('visual.color', '#3b82f6');
+```
+
+---
+
+## Best Practices
+
+### 1. Always Pass Term ID
+
+```php
+// ✅ Good - explicit term ID
+$icon = OptStack::getField('category_settings', 'icon', '', $term_id);
+
+// ❌ Risky - relies on queried object
+$term = get_queried_object();
+$icon = OptStack::getField('category_settings', 'icon', '', $term->term_id);
+```
+
+### 2. Handle Missing Terms
+
+```php
+$term = get_queried_object();
+
+if ($term && isset($term->term_id)) {
+    $icon = OptStack::getField('category_settings', 'icon', '', $term->term_id);
+} else {
+    $icon = ''; // Default fallback
+}
+```
+
+### 3. Create Helper Functions
+
+```php
+function get_term_setting(string $stack, string $key, mixed $default = null, ?int $id = null): mixed
+{
+    if (!$id) {
+        $term = get_queried_object();
+        $id = $term->term_id ?? 0;
+    }
+    return $id ? OptStack::getField($stack, $key, $default, $id) : $default;
+}
+```
+
+### 4. Use for Custom Taxonomies
+
+```php
+// Works with any taxonomy
+OptStack::make('product_cat_settings')
+    ->forTaxonomy('product_cat')  // WooCommerce product categories
+    ->define(function ($stack) {
+        // ...
+    })
+    ->build();
+```

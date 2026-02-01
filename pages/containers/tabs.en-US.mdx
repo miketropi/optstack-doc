@@ -1,0 +1,314 @@
+---
+title: Tabs
+---
+
+# Tabs
+
+Tabs organize your options page into separate sections, making it easier to navigate complex settings.
+
+---
+
+## Basic Tabs
+
+```php
+OptStack::make('theme_options')
+    ->forOptions()
+    ->label('Theme Options')
+    ->define(function ($stack) {
+        
+        // General Tab
+        $stack->tab('general', function ($tab) {
+            $tab->field('site_name', ['type' => 'text', 'label' => 'Site Name']);
+            $tab->field('tagline', ['type' => 'text', 'label' => 'Tagline']);
+        });
+        
+        // Colors Tab
+        $stack->tab('colors', function ($tab) {
+            $tab->field('primary_color', ['type' => 'color', 'label' => 'Primary']);
+            $tab->field('secondary_color', ['type' => 'color', 'label' => 'Secondary']);
+        });
+        
+        // Typography Tab
+        $stack->tab('typography', function ($tab) {
+            $tab->field('body_font', ['type' => 'typography', 'label' => 'Body Font']);
+            $tab->field('heading_font', ['type' => 'typography', 'label' => 'Heading Font']);
+        });
+        
+    })
+    ->build();
+```
+
+---
+
+## Tab Configuration
+
+Configure tab properties using fluent methods:
+
+```php
+$stack->tab('tab_key', function ($tab) {
+    // Configure tab properties
+    $tab->label('Tab Label')
+        ->icon('dashicons-admin-settings')  // Dashicon or custom icon
+        ->description('Description text')
+        ->priority(10);                     // Lower = appears first
+    
+    // Add fields
+    $tab->field('field_1', [...]);
+    $tab->field('field_2', [...]);
+});
+```
+
+### Configuration Methods
+
+| Method | Description |
+|--------|-------------|
+| `label(string)` | Display label for the tab |
+| `icon(string)` | Dashicon class or custom icon |
+| `description(string)` | Description text |
+| `priority(int)` | Tab order (lower = first) |
+
+---
+
+## Groups Inside Tabs
+
+You can add groups inside tabs to further organize fields:
+
+```php
+$stack->tab('general', function ($tab) {
+    $tab->label('General')
+        ->priority(10);
+    
+    // Direct fields in tab
+    $tab->field('site_name', ['type' => 'text', 'label' => 'Site Name']);
+    
+    // Group inside tab
+    $tab->group('identity', function ($group) {
+        $group->field('logo', ['type' => 'media', 'label' => 'Logo']);
+        $group->field('favicon', ['type' => 'media', 'label' => 'Favicon']);
+    }, ['label' => 'Site Identity']);
+    
+    // Another group
+    $tab->group('social_links', function ($group) {
+        $group->field('facebook', ['type' => 'url', 'label' => 'Facebook']);
+        $group->field('twitter', ['type' => 'url', 'label' => 'Twitter']);
+        $group->field('instagram', ['type' => 'url', 'label' => 'Instagram']);
+    }, ['label' => 'Social Links']);
+});
+```
+
+**Data Structure:**
+
+```php
+[
+    'site_name' => 'My Site',
+    'identity' => [
+        'logo' => 123,
+        'favicon' => 124,
+    ],
+    'social_links' => [
+        'facebook' => 'https://facebook.com/...',
+        'twitter' => 'https://twitter.com/...',
+        'instagram' => 'https://instagram.com/...',
+    ]
+]
+```
+
+> **Important:** Tabs are for UI organization only. Fields and groups inside tabs are stored at the root level, not nested under the tab key.
+
+---
+
+## Tab Priority & Ordering
+
+Control tab order using the `priority` setting:
+
+```php
+$stack->tab('general', function ($tab) {
+    $tab->label('General')->priority(10);  // Appears first
+    // ...
+});
+
+$stack->tab('appearance', function ($tab) {
+    $tab->label('Appearance')->priority(20);  // Appears second
+    // ...
+});
+
+$stack->tab('advanced', function ($tab) {
+    $tab->label('Advanced')->priority(100);  // Appears last
+    // ...
+});
+```
+
+### Priority Guidelines
+
+| Priority Range | Use Case |
+|----------------|----------|
+| 1-10 | Primary tabs (General, Main) |
+| 11-30 | Core feature tabs |
+| 31-50 | Secondary feature tabs |
+| 51-80 | Configuration tabs |
+| 81-100 | Advanced/Developer tabs |
+
+---
+
+## Complete Tab Example
+
+```php
+OptStack::make('theme_options')
+    ->forOptions()
+    ->menuParent('themes.php')
+    ->label('Theme Options')
+    ->define(function ($stack) {
+        
+        // General Tab
+        $stack->tab('general', function ($tab) {
+            $tab->label('General')
+                ->icon('dashicons-admin-generic')
+                ->priority(10);
+            
+            $tab->group('identity', function ($group) {
+                $group->field('site_logo', [
+                    'type' => 'media',
+                    'label' => 'Site Logo',
+                    'attributes' => ['allowedTypes' => ['image']],
+                ]);
+                $group->field('favicon', [
+                    'type' => 'media',
+                    'label' => 'Favicon',
+                ]);
+            }, ['label' => 'Site Identity', 'layout' => 'box']);
+            
+            $tab->group('layout', function ($group) {
+                $group->field('container_width', [
+                    'type' => 'number',
+                    'label' => 'Container Width',
+                    'default' => 1200,
+                    'attributes' => ['suffix' => 'px'],
+                ]);
+                $group->field('sidebar_layout', [
+                    'type' => 'select',
+                    'label' => 'Sidebar Layout',
+                    'options' => [
+                        ['value' => 'left', 'label' => 'Left Sidebar'],
+                        ['value' => 'right', 'label' => 'Right Sidebar'],
+                        ['value' => 'none', 'label' => 'No Sidebar'],
+                    ],
+                ]);
+            }, ['label' => 'Layout', 'layout' => 'box']);
+        });
+        
+        // Colors Tab
+        $stack->tab('colors', function ($tab) {
+            $tab->label('Colors')
+                ->icon('dashicons-art')
+                ->priority(20);
+            
+            $tab->group('primary_colors', function ($group) {
+                $group->field('brand', ['type' => 'color', 'label' => 'Brand Color', 'default' => '#3b82f6']);
+                $group->field('secondary', ['type' => 'color', 'label' => 'Secondary', 'default' => '#8b5cf6']);
+                $group->field('accent', ['type' => 'color', 'label' => 'Accent', 'default' => '#10b981']);
+            }, ['label' => 'Primary Colors', 'layout' => 'box']);
+            
+            $tab->group('text_colors', function ($group) {
+                $group->field('heading', ['type' => 'color', 'label' => 'Heading', 'default' => '#111827']);
+                $group->field('body', ['type' => 'color', 'label' => 'Body Text', 'default' => '#374151']);
+                $group->field('muted', ['type' => 'color', 'label' => 'Muted', 'default' => '#9ca3af']);
+            }, ['label' => 'Text Colors', 'layout' => 'box']);
+        });
+        
+        // Advanced Tab
+        $stack->tab('advanced', function ($tab) {
+            $tab->label('Advanced')
+                ->icon('dashicons-admin-tools')
+                ->priority(100);
+            
+            $tab->field('custom_css', [
+                'type' => 'code',
+                'label' => 'Custom CSS',
+                'attributes' => ['language' => 'css'],
+            ]);
+            
+            $tab->field('custom_js', [
+                'type' => 'code',
+                'label' => 'Custom JavaScript',
+                'attributes' => ['language' => 'javascript'],
+            ]);
+        });
+        
+    })
+    ->build();
+```
+
+---
+
+## Retrieving Tab Data
+
+Since tabs don't affect data structure, retrieve data normally:
+
+```php
+use OptStack\OptStack;
+
+// Fields and groups inside tabs are at root level
+$logo = OptStack::getField('theme_options', 'identity.site_logo', '');
+$brandColor = OptStack::getField('theme_options', 'primary_colors.brand', '#3b82f6');
+$customCss = OptStack::getField('theme_options', 'custom_css', '');
+```
+
+---
+
+## Best Practices
+
+### 1. Use Tabs for Large Option Pages
+
+```php
+// ✅ Good: Organized with tabs
+$stack->tab('general', function ($tab) {...});
+$stack->tab('appearance', function ($tab) {...});
+$stack->tab('advanced', function ($tab) {...});
+
+// ❌ Bad: All fields at root level
+$stack->field('site_name', [...]);
+$stack->field('primary_color', [...]);
+$stack->field('cache_duration', [...]);
+// ... 50 more fields
+```
+
+### 2. Group Related Settings in Same Tab
+
+```php
+// ✅ Good: Related settings together
+$stack->tab('appearance', function ($tab) {
+    $tab->group('colors', function ($group) {...});
+    $tab->group('typography', function ($group) {...});
+    $tab->group('layout', function ($group) {...});
+});
+
+// ❌ Bad: Unrelated settings in same tab
+$stack->tab('misc', function ($tab) {
+    $tab->field('color', [...]);
+    $tab->field('api_key', [...]);
+    $tab->field('enable_cache', [...]);
+});
+```
+
+### 3. Use Consistent Priority Spacing
+
+```php
+// ✅ Good: Consistent spacing allows insertion
+$stack->tab('general', function ($tab) {
+    $tab->priority(10);
+});
+$stack->tab('colors', function ($tab) {
+    $tab->priority(20);
+});
+$stack->tab('typography', function ($tab) {
+    $tab->priority(30);  // Can insert at 25 later
+});
+
+// ❌ Bad: No room for insertion
+$stack->tab('general', function ($tab) {
+    $tab->priority(1);
+});
+$stack->tab('colors', function ($tab) {
+    $tab->priority(2);
+});
+```

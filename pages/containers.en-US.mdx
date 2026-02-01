@@ -1,0 +1,150 @@
+---
+title: Containers Overview
+---
+
+# OptStack Containers
+
+Containers help you organize fields in OptStack. They provide structure for both the UI and the stored data.
+
+## Container Types
+
+OptStack provides three types of containers:
+
+| Container | Purpose | Use Case |
+|-----------|---------|----------|
+| **[Group](/containers/groups)** | Logical grouping of related fields | Address fields, pricing info, SEO settings |
+| **[Tab](/containers/tabs)** | Separate sections in a tabbed interface | General, Colors, Typography, Layout tabs |
+| **[Modal](/containers/modals)** | Deferred group shown in a modal/drawer | Advanced settings, rarely-used configurations |
+
+## Quick Comparison
+
+### Groups
+
+Groups organize related fields together, creating a logical structure for both the UI and the stored data.
+
+```php
+$stack->group('address', function ($group) {
+    $group->field('street', ['type' => 'text', 'label' => 'Street']);
+    $group->field('city', ['type' => 'text', 'label' => 'City']);
+}, ['label' => 'Address']);
+```
+
+[Learn more about Groups →](/containers/groups)
+
+### Tabs
+
+Tabs organize your options page into separate sections, making it easier to navigate complex settings.
+
+```php
+$stack->tab('general', function ($tab) {
+    $tab->field('site_name', ['type' => 'text', 'label' => 'Site Name']);
+});
+
+$stack->tab('colors', function ($tab) {
+    $tab->field('primary', ['type' => 'color', 'label' => 'Primary Color']);
+});
+```
+
+[Learn more about Tabs →](/containers/tabs)
+
+### Modals (Deferred Groups)
+
+Modals show a trigger button that opens fields in a modal/drawer, reducing UI clutter.
+
+```php
+$stack->group('seo_settings', function ($group) {
+    $group->field('meta_title', ['type' => 'text', 'label' => 'Meta Title']);
+    $group->field('meta_description', ['type' => 'textarea', 'label' => 'Description']);
+}, [
+    'label' => 'SEO Settings',
+    'deferred' => true,
+    'ui' => ['triggerLabel' => 'Configure SEO', 'render' => 'modal'],
+]);
+```
+
+[Learn more about Modals →](/containers/modals)
+
+---
+
+## Combining Containers
+
+You can combine all container types for complex UIs:
+
+```php
+OptStack::make('theme_options')
+    ->forOptions()
+    ->define(function ($stack) {
+        
+        // Tab with inline group and modal group
+        $stack->tab('general', function ($tab) {
+            $tab->label('General')->priority(10);
+            
+            // Inline group
+            $tab->group('identity', function ($group) {
+                $group->field('logo', ['type' => 'media']);
+                $group->field('favicon', ['type' => 'media']);
+            }, ['label' => 'Site Identity']);
+            
+            // Modal group for advanced settings
+            $tab->group('advanced', function ($group) {
+                $group->field('custom_css', ['type' => 'code']);
+                $group->field('custom_js', ['type' => 'code']);
+            }, [
+                'label' => 'Custom Code',
+                'deferred' => true,
+                'ui' => ['triggerLabel' => 'Add Custom Code', 'render' => 'modal'],
+            ]);
+        });
+        
+        // Tab with repeatable group
+        $stack->tab('layout', function ($tab) {
+            $tab->label('Layout')->priority(20);
+            
+            $tab->group('sidebars', function ($group) {
+                $group->field('name', ['type' => 'text']);
+                $group->field('position', ['type' => 'select']);
+            }, [
+                'label' => 'Custom Sidebars',
+                'repeatable' => true,
+                'max_items' => 5,
+            ]);
+        });
+        
+    })
+    ->build();
+```
+
+---
+
+## Data Structure
+
+Understanding how data is structured helps when retrieving values:
+
+| Container | Data Structure |
+|-----------|---------------|
+| Groups in Stack | `['group_key' => ['field' => 'value']]` |
+| Groups in Tabs | Same as above (tabs don't affect data structure) |
+| Nested Groups | `['parent' => ['child' => ['field' => 'value']]]` |
+| Repeatable Groups | `['group' => [['field' => 'value'], ['field' => 'value']]]` |
+
+> **Note:** Tabs are for UI organization only. Fields and groups inside tabs are stored at the root level, not nested under the tab key.
+
+---
+
+## Retrieving Container Data
+
+```php
+use OptStack\OptStack;
+
+// Simple group field
+$logo = OptStack::getField('theme_options', 'identity.logo', '');
+
+// Nested group field
+$city = OptStack::getField('settings', 'company.address.city', '');
+
+// Repeatable group (get all items)
+$items = OptStack::getField('settings', 'team_members', []);
+
+// For post/term meta
+$seoTitle = OptStack::getField('product_meta', 'seo.title', '', $post_id);
+```

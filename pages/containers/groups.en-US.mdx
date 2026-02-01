@@ -1,0 +1,315 @@
+---
+title: Groups
+---
+
+# Groups
+
+Groups organize related fields together, creating a logical structure for both the UI and the stored data.
+
+---
+
+## Basic Groups
+
+```php
+$stack->group('address', function ($group) {
+    $group->field('street', ['type' => 'text', 'label' => 'Street Address']);
+    $group->field('city', ['type' => 'text', 'label' => 'City']);
+    $group->field('state', ['type' => 'text', 'label' => 'State']);
+    $group->field('zip', ['type' => 'text', 'label' => 'ZIP Code']);
+}, ['label' => 'Address']);
+```
+
+**Data Structure:**
+
+```php
+[
+    'address' => [
+        'street' => '123 Main St',
+        'city' => 'New York',
+        'state' => 'NY',
+        'zip' => '10001',
+    ]
+]
+```
+
+---
+
+## Group Configuration
+
+Groups support the following configuration options:
+
+```php
+$stack->group('group_key', function ($group) {
+    // Define fields here
+}, [
+    // Display options
+    'label' => 'Group Label',           // Display label
+    'description' => 'Help text',       // Description shown below label
+    
+    // Layout options
+    'layout' => 'box',                  // 'inline' (default) or 'box'
+    'collapsible' => true,              // Allow collapsing the group
+    
+    // Repeatable options
+    'repeatable' => true,               // Allow multiple instances
+    'min_items' => 1,                   // Minimum items (repeatable)
+    'max_items' => 10,                  // Maximum items (repeatable)
+    
+    // Modal/Deferred options
+    'deferred' => true,                 // Show in modal instead of inline
+    'ui' => [
+        'triggerLabel' => 'Configure',  // Button label
+        'render' => 'modal',            // 'modal', 'drawer', or 'panel'
+    ],
+    
+    // Conditional visibility
+    'conditions' => [
+        ['field' => 'enable_feature', 'operator' => '==', 'value' => true],
+    ],
+]);
+```
+
+### Configuration Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `label` | string | Display label for the group |
+| `description` | string | Help text shown below label |
+| `layout` | string | `'inline'` (default) or `'box'` |
+| `collapsible` | bool | Allow collapsing the group |
+| `repeatable` | bool | Allow multiple instances |
+| `min_items` | int | Minimum items for repeatable groups |
+| `max_items` | int | Maximum items for repeatable groups |
+| `deferred` | bool | Show in modal instead of inline |
+| `ui` | array | UI options for deferred groups |
+| `conditions` | array | Conditional visibility rules |
+
+---
+
+## Nested Groups
+
+Groups can be nested inside other groups:
+
+```php
+$stack->group('company', function ($group) {
+    $group->field('name', ['type' => 'text', 'label' => 'Company Name']);
+    $group->field('email', ['type' => 'email', 'label' => 'Email']);
+    
+    // Nested group for address
+    $group->group('address', function ($nested) {
+        $nested->field('street', ['type' => 'text', 'label' => 'Street']);
+        $nested->field('city', ['type' => 'text', 'label' => 'City']);
+        $nested->field('country', [
+            'type' => 'select',
+            'label' => 'Country',
+            'options' => [
+                ['value' => 'US', 'label' => 'United States'],
+                ['value' => 'CA', 'label' => 'Canada'],
+                ['value' => 'UK', 'label' => 'United Kingdom'],
+            ],
+        ]);
+    }, ['label' => 'Company Address']);
+    
+}, ['label' => 'Company Information']);
+```
+
+**Data Structure:**
+
+```php
+[
+    'company' => [
+        'name' => 'Acme Inc',
+        'email' => 'contact@acme.com',
+        'address' => [
+            'street' => '123 Business Ave',
+            'city' => 'San Francisco',
+            'country' => 'US',
+        ]
+    ]
+]
+```
+
+---
+
+## Repeatable Groups
+
+Repeatable groups allow users to add multiple instances of a set of fields:
+
+```php
+$stack->group('team_members', function ($group) {
+    $group->field('name', ['type' => 'text', 'label' => 'Name']);
+    $group->field('role', ['type' => 'text', 'label' => 'Role']);
+    $group->field('photo', ['type' => 'media', 'label' => 'Photo']);
+    $group->field('bio', ['type' => 'textarea', 'label' => 'Bio']);
+}, [
+    'label' => 'Team Members',
+    'repeatable' => true,
+    'min_items' => 1,
+    'max_items' => 20,
+]);
+```
+
+**Data Structure (Array of items):**
+
+```php
+[
+    'team_members' => [
+        [
+            'name' => 'John Doe',
+            'role' => 'CEO',
+            'photo' => 123,
+            'bio' => 'John is the founder...',
+        ],
+        [
+            'name' => 'Jane Smith',
+            'role' => 'CTO',
+            'photo' => 124,
+            'bio' => 'Jane leads our tech team...',
+        ],
+    ]
+]
+```
+
+### Repeatable Group Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `repeatable` | bool | `false` | Enable repeatable mode |
+| `min_items` | int | `0` | Minimum number of items |
+| `max_items` | int | `null` | Maximum number of items (null = unlimited) |
+
+---
+
+## Collapsible Groups
+
+Collapsible groups can be expanded/collapsed to reduce UI clutter:
+
+```php
+$stack->group('advanced_settings', function ($group) {
+    $group->field('cache_duration', ['type' => 'number', 'label' => 'Cache Duration']);
+    $group->field('debug_mode', ['type' => 'toggle', 'label' => 'Debug Mode']);
+    $group->field('custom_code', ['type' => 'code', 'label' => 'Custom Code']);
+}, [
+    'label' => 'Advanced Settings',
+    'collapsible' => true,
+    'layout' => 'box',
+]);
+```
+
+---
+
+## Conditional Groups
+
+Groups can be shown/hidden based on other field values:
+
+```php
+// Enable toggle
+$stack->field('enable_shipping', [
+    'type' => 'toggle',
+    'label' => 'Enable Shipping',
+    'default' => false,
+]);
+
+// Conditional group - only shows when shipping is enabled
+$stack->group('shipping', function ($group) {
+    $group->field('method', [
+        'type' => 'select',
+        'label' => 'Shipping Method',
+        'options' => [
+            ['value' => 'flat', 'label' => 'Flat Rate'],
+            ['value' => 'free', 'label' => 'Free Shipping'],
+            ['value' => 'calculated', 'label' => 'Calculated'],
+        ],
+    ]);
+    $group->field('cost', ['type' => 'number', 'label' => 'Shipping Cost']);
+}, [
+    'label' => 'Shipping Options',
+    'conditions' => [
+        ['field' => 'enable_shipping', 'operator' => '==', 'value' => true],
+    ],
+]);
+```
+
+---
+
+## Retrieving Group Data
+
+```php
+use OptStack\OptStack;
+
+// Simple group field
+$street = OptStack::getField('settings', 'address.street', '');
+
+// Nested group field
+$city = OptStack::getField('settings', 'company.address.city', '');
+
+// Repeatable group (get all items)
+$members = OptStack::getField('settings', 'team_members', []);
+
+// Loop through repeatable items
+foreach ($members as $member) {
+    echo $member['name'] . ' - ' . $member['role'];
+}
+
+// For post meta
+$price = OptStack::getField('product_data', 'pricing.regular_price', 0, $post_id);
+```
+
+---
+
+## Best Practices
+
+### 1. Group Related Fields
+
+```php
+// ✅ Good: Related fields grouped together
+$stack->group('contact', function ($group) {
+    $group->field('email', [...]);
+    $group->field('phone', [...]);
+    $group->field('address', [...]);
+}, ['label' => 'Contact Information']);
+
+// ❌ Bad: Unrelated fields in same group
+$stack->group('misc', function ($group) {
+    $group->field('email', [...]);
+    $group->field('theme_color', [...]);
+    $group->field('enable_cache', [...]);
+});
+```
+
+### 2. Limit Nesting Depth
+
+```php
+// ✅ Good: Max 2 levels of nesting
+$stack->group('company', function ($group) {
+    $group->group('address', function ($nested) {
+        $nested->field('street', [...]);
+        $nested->field('city', [...]);
+    });
+});
+
+// ❌ Bad: Too deeply nested
+$stack->group('a', function ($g) {
+    $g->group('b', function ($g) {
+        $g->group('c', function ($g) {
+            $g->group('d', function ($g) {...});
+        });
+    });
+});
+```
+
+### 3. Use Descriptive Keys
+
+```php
+// ✅ Good: Descriptive, readable keys
+$stack->group('shipping_options', function ($group) {
+    $group->field('enable_free_shipping', [...]);
+    $group->field('free_shipping_threshold', [...]);
+});
+
+// ❌ Bad: Cryptic or unclear keys
+$stack->group('so', function ($group) {
+    $group->field('efs', [...]);
+    $group->field('fst', [...]);
+});
+```

@@ -1,0 +1,502 @@
+---
+title: UserStore
+---
+
+# UserStore
+
+Stores data in the `wp_usermeta` table. Used for custom user profile fields.
+
+---
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **WordPress Table** | `wp_usermeta` |
+| **WordPress Function** | `get_user_meta()` / `update_user_meta()` |
+| **Use Case** | User profile extensions, user preferences, author information |
+| **Object ID Required** | Yes (`$user_id`) |
+
+---
+
+## Stack Definition
+
+```php
+OptStack::make('user_profile')
+    ->forUser()
+    ->label('Extended Profile')
+    ->define(function ($stack) {
+        $stack->field('bio', ['type' => 'textarea', 'label' => 'Biography']);
+        $stack->field('avatar', ['type' => 'media', 'label' => 'Custom Avatar']);
+        
+        $stack->group('social', function ($group) {
+            $group->field('twitter', ['type' => 'url', 'label' => 'Twitter']);
+            $group->field('linkedin', ['type' => 'url', 'label' => 'LinkedIn']);
+            $group->field('github', ['type' => 'url', 'label' => 'GitHub']);
+        }, ['label' => 'Social Links']);
+    })
+    ->build();
+```
+
+---
+
+## How Data is Stored
+
+```sql
+-- In wp_usermeta table
+user_id: 1
+meta_key: user_profile
+meta_value: a:3:{s:3:"bio";s:20:"About the author...";s:6:"avatar";i:789;s:6:"social";a:3:{s:7:"twitter";s:24:"https://twitter.com/...";s:8:"linkedin";s:25:"https://linkedin.com/...";s:6:"github";s:22:"https://github.com/...";}}
+```
+
+**Unserialized Data:**
+
+```php
+[
+    'bio' => 'About the author...',
+    'avatar' => 789,
+    'social' => [
+        'twitter' => 'https://twitter.com/...',
+        'linkedin' => 'https://linkedin.com/...',
+        'github' => 'https://github.com/...',
+    ]
+]
+```
+
+---
+
+## Constructor
+
+```php
+new UserStore(int $userId, string $metaKey)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$userId` | int | The WordPress user ID |
+| `$metaKey` | string | The meta key (stack ID) |
+
+---
+
+## Methods
+
+### Inherited from StoreInterface
+
+```php
+$store->get(string $key, mixed $default = null): mixed
+$store->set(string $key, mixed $value): bool
+$store->delete(string $key): bool
+$store->all(): array
+$store->has(string $key): bool
+$store->setMany(array $values): bool
+$store->replace(array $data): bool
+$store->deleteAll(): bool
+$store->clearCache(): void
+```
+
+### Unique Methods
+
+```php
+// Get the user ID
+$store->getUserId(): int
+
+// Set the user ID (for reusing store instance)
+$store->setUserId(int $userId): self
+
+// Get the meta key
+$store->getMetaKey(): string
+```
+
+---
+
+## Retrieving Data
+
+### Using OptStack Facade (Recommended)
+
+```php
+use OptStack\OptStack;
+
+// Get simple field (requires user ID)
+$bio = OptStack::getField('user_profile', 'bio', '', $user_id);
+
+// Get nested field (dot notation)
+$twitter = OptStack::getField('user_profile', 'social.twitter', '', $user_id);
+
+// Get all data
+$profileData = OptStack::getData('user_profile', $user_id);
+```
+
+### For Current User
+
+```php
+$current_user_id = get_current_user_id();
+
+$bio = OptStack::getField('user_profile', 'bio', '', $current_user_id);
+$avatar = OptStack::getField('user_profile', 'avatar', '', $current_user_id);
+```
+
+### For Post Author
+
+```php
+// In single.php or content template
+$author_id = get_the_author_meta('ID');
+
+$bio = OptStack::getField('user_profile', 'bio', '', $author_id);
+$twitter = OptStack::getField('user_profile', 'social.twitter', '', $author_id);
+```
+
+### Using WordPress Functions
+
+```php
+// Get all user meta
+$data = get_user_meta($user_id, 'user_profile', true);
+
+// Access specific field
+$bio = $data['bio'] ?? '';
+
+// Access nested field
+$twitter = $data['social']['twitter'] ?? '';
+```
+
+### Direct Store Access
+
+```php
+use OptStack\WordPress\Store\UserStore;
+
+$store = new UserStore($user_id, 'user_profile');
+
+// Get value
+$bio = $store->get('bio', '');
+
+// Get all data
+$allData = $store->all();
+
+// Check if exists
+if ($store->has('avatar')) {
+    // ...
+}
+```
+
+---
+
+## Updating Data
+
+### Using OptStack Facade (Recommended)
+
+```php
+use OptStack\OptStack;
+
+// Update single field
+OptStack::updateField('user_profile', 'bio', 'Updated biography...', $user_id);
+
+// Update nested field
+OptStack::updateField('user_profile', 'social.twitter', 'https://twitter.com/newhandle', $user_id);
+
+// Save multiple fields
+OptStack::saveData('user_profile', [
+    'bio' => 'New bio',
+    'avatar' => 456,
+], $user_id);
+```
+
+### Direct Store Access
+
+```php
+$store = new UserStore($user_id, 'user_profile');
+
+// Set single value
+$store->set('bio', 'Updated biography');
+
+// Set multiple values (efficient)
+$store->setMany([
+    'bio' => 'New bio',
+    'avatar' => 456,
+]);
+```
+
+---
+
+## Automatic Store Binding
+
+UserStore is automatically bound in these scenarios:
+
+### 1. REST API with object_id
+
+```
+GET /wp-json/optstack/v1/stacks/user_profile?object_id=1
+```
+
+### 2. Using OptStack::getField() with user ID
+
+```php
+// The $user_id triggers automatic UserStore binding
+$bio = OptStack::getField('user_profile', 'bio', '', $user_id);
+```
+
+### 3. During User Hooks
+
+When editing a user profile in the admin, OptStack automatically binds the UserStore via `profile_update` and `user_register` hooks.
+
+---
+
+## Complete Example
+
+### Extended User Profile
+
+```php
+<?php
+use OptStack\OptStack;
+
+add_action('optstack_init', function () {
+    OptStack::make('user_profile')
+        ->forUser()
+        ->label('Extended Profile')
+        ->define(function ($stack) {
+            
+            // Basic Info
+            $stack->group('info', function ($group) {
+                $group->field('job_title', [
+                    'type' => 'text',
+                    'label' => 'Job Title',
+                ]);
+                $group->field('company', [
+                    'type' => 'text',
+                    'label' => 'Company',
+                ]);
+                $group->field('location', [
+                    'type' => 'text',
+                    'label' => 'Location',
+                ]);
+                $group->field('bio', [
+                    'type' => 'textarea',
+                    'label' => 'Short Bio',
+                    'attributes' => ['rows' => 4],
+                ]);
+            }, ['label' => 'Basic Information', 'layout' => 'box']);
+            
+            // Profile Image
+            $stack->group('media', function ($group) {
+                $group->field('avatar', [
+                    'type' => 'media',
+                    'label' => 'Profile Photo',
+                    'attributes' => ['allowedTypes' => ['image']],
+                ]);
+                $group->field('cover_image', [
+                    'type' => 'media',
+                    'label' => 'Cover Image',
+                    'attributes' => ['allowedTypes' => ['image']],
+                ]);
+            }, ['label' => 'Profile Images', 'layout' => 'box']);
+            
+            // Social Links
+            $stack->group('social', function ($group) {
+                $group->field('website', ['type' => 'url', 'label' => 'Website']);
+                $group->field('twitter', ['type' => 'url', 'label' => 'Twitter']);
+                $group->field('linkedin', ['type' => 'url', 'label' => 'LinkedIn']);
+                $group->field('github', ['type' => 'url', 'label' => 'GitHub']);
+                $group->field('instagram', ['type' => 'url', 'label' => 'Instagram']);
+            }, ['label' => 'Social Links', 'layout' => 'box']);
+            
+            // Preferences (Modal)
+            $stack->group('preferences', function ($group) {
+                $group->field('email_notifications', [
+                    'type' => 'toggle',
+                    'label' => 'Email Notifications',
+                    'default' => true,
+                ]);
+                $group->field('public_profile', [
+                    'type' => 'toggle',
+                    'label' => 'Public Profile',
+                    'default' => true,
+                ]);
+                $group->field('theme', [
+                    'type' => 'select',
+                    'label' => 'Theme Preference',
+                    'default' => 'auto',
+                    'options' => [
+                        ['value' => 'auto', 'label' => 'Auto (System)'],
+                        ['value' => 'light', 'label' => 'Light'],
+                        ['value' => 'dark', 'label' => 'Dark'],
+                    ],
+                ]);
+            }, [
+                'label' => 'Preferences',
+                'deferred' => true,
+                'ui' => ['triggerLabel' => 'Edit Preferences', 'render' => 'modal'],
+            ]);
+            
+        })
+        ->build();
+});
+```
+
+### Author Box in Theme
+
+```php
+// author-box.php (partial)
+function render_author_box($user_id = null) {
+    $user_id = $user_id ?? get_the_author_meta('ID');
+    $user = get_userdata($user_id);
+    
+    // Get extended profile data
+    $job_title = OptStack::getField('user_profile', 'info.job_title', '', $user_id);
+    $company = OptStack::getField('user_profile', 'info.company', '', $user_id);
+    $bio = OptStack::getField('user_profile', 'info.bio', '', $user_id);
+    $avatar = OptStack::getField('user_profile', 'media.avatar', '', $user_id);
+    
+    // Social links
+    $twitter = OptStack::getField('user_profile', 'social.twitter', '', $user_id);
+    $linkedin = OptStack::getField('user_profile', 'social.linkedin', '', $user_id);
+    $github = OptStack::getField('user_profile', 'social.github', '', $user_id);
+    
+    ?>
+    <div class="author-box">
+        <div class="author-avatar">
+            <?php if ($avatar): ?>
+                <img src="<?php echo esc_url(wp_get_attachment_url($avatar)); ?>" alt="">
+            <?php else: ?>
+                <?php echo get_avatar($user_id, 96); ?>
+            <?php endif; ?>
+        </div>
+        
+        <div class="author-info">
+            <h4 class="author-name"><?php echo esc_html($user->display_name); ?></h4>
+            
+            <?php if ($job_title || $company): ?>
+                <p class="author-title">
+                    <?php echo esc_html($job_title); ?>
+                    <?php if ($job_title && $company): ?> at <?php endif; ?>
+                    <?php echo esc_html($company); ?>
+                </p>
+            <?php endif; ?>
+            
+            <?php if ($bio): ?>
+                <p class="author-bio"><?php echo esc_html($bio); ?></p>
+            <?php endif; ?>
+            
+            <div class="author-social">
+                <?php if ($twitter): ?>
+                    <a href="<?php echo esc_url($twitter); ?>" rel="noopener">Twitter</a>
+                <?php endif; ?>
+                <?php if ($linkedin): ?>
+                    <a href="<?php echo esc_url($linkedin); ?>" rel="noopener">LinkedIn</a>
+                <?php endif; ?>
+                <?php if ($github): ?>
+                    <a href="<?php echo esc_url($github); ?>" rel="noopener">GitHub</a>
+                <?php endif; ?>
+            </div>
+        </div>
+    </div>
+    <?php
+}
+```
+
+### Helper Functions
+
+```php
+/**
+ * Get user profile field.
+ */
+function get_user_profile_field(string $key, mixed $default = null, ?int $user_id = null): mixed
+{
+    $user_id = $user_id ?? get_current_user_id();
+    return OptStack::getField('user_profile', $key, $default, $user_id);
+}
+
+/**
+ * Get author profile field (for post context).
+ */
+function get_author_field(string $key, mixed $default = null): mixed
+{
+    $author_id = get_the_author_meta('ID');
+    return OptStack::getField('user_profile', $key, $default, $author_id);
+}
+
+// Usage
+$bio = get_user_profile_field('info.bio', 'No bio available');
+$twitter = get_author_field('social.twitter', '');
+```
+
+---
+
+## User Roles & Capabilities
+
+You can conditionally show fields based on user roles:
+
+```php
+$stack->field('admin_notes', [
+    'type' => 'textarea',
+    'label' => 'Admin Notes',
+    'conditions' => [
+        // Only show for administrators viewing profiles
+        // (Implement custom condition logic)
+    ],
+]);
+```
+
+---
+
+## Best Practices
+
+### 1. Always Pass User ID
+
+```php
+// ✅ Good - explicit user ID
+$bio = OptStack::getField('user_profile', 'bio', '', $user_id);
+
+// ✅ Good - for current user
+$bio = OptStack::getField('user_profile', 'bio', '', get_current_user_id());
+
+// ❌ Risky - no user ID
+$bio = OptStack::getField('user_profile', 'bio', '');
+```
+
+### 2. Handle Anonymous Users
+
+```php
+$user_id = get_current_user_id();
+
+if ($user_id) {
+    $preferences = OptStack::getField('user_profile', 'preferences', [], $user_id);
+} else {
+    // Default preferences for logged-out users
+    $preferences = ['theme' => 'auto'];
+}
+```
+
+### 3. Create Helper Functions
+
+```php
+function current_user_setting(string $key, mixed $default = null): mixed
+{
+    $user_id = get_current_user_id();
+    return $user_id ? OptStack::getField('user_profile', $key, $default, $user_id) : $default;
+}
+
+// Usage
+$theme = current_user_setting('preferences.theme', 'auto');
+```
+
+### 4. Respect Privacy Settings
+
+```php
+$is_public = OptStack::getField('user_profile', 'preferences.public_profile', true, $user_id);
+
+if ($is_public || $user_id === get_current_user_id()) {
+    // Show profile data
+} else {
+    // Show limited data
+}
+```
+
+### 5. Use Modals for Preferences
+
+```php
+// Keep profile edit page clean
+$stack->group('preferences', function ($group) {
+    // Many preference fields...
+}, [
+    'deferred' => true,
+    'ui' => ['triggerLabel' => 'Edit Preferences'],
+]);
+```

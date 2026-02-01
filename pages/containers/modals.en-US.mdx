@@ -1,0 +1,358 @@
+---
+title: Modals (Deferred Groups)
+---
+
+# Modals (Deferred Groups)
+
+Modals are groups that don't render inline. Instead, they show a trigger button that opens a modal/drawer/panel when clicked.
+
+---
+
+## What is a Deferred Group?
+
+A **Deferred Group** (Modal) is a group that shows a trigger button instead of inline fields. This is useful for:
+
+- Reducing UI clutter
+- Hiding advanced or rarely-used settings
+- Organizing complex configurations
+
+**Key Principle:** A deferred group is purely a **rendering strategy**. The data structure and storage remain identical to normal groups.
+
+---
+
+## Basic Modal Usage
+
+```php
+$stack->group('seo_settings', function ($group) {
+    $group->field('meta_title', ['type' => 'text', 'label' => 'Meta Title']);
+    $group->field('meta_description', ['type' => 'textarea', 'label' => 'Meta Description']);
+    $group->field('og_image', ['type' => 'media', 'label' => 'OG Image']);
+    $group->field('robots', [
+        'type' => 'select',
+        'label' => 'Robots',
+        'options' => [
+            ['value' => 'index,follow', 'label' => 'Index, Follow'],
+            ['value' => 'noindex,follow', 'label' => 'No Index, Follow'],
+            ['value' => 'index,nofollow', 'label' => 'Index, No Follow'],
+            ['value' => 'noindex,nofollow', 'label' => 'No Index, No Follow'],
+        ],
+    ]);
+}, [
+    'label' => 'SEO Settings',
+    'deferred' => true,
+    'ui' => [
+        'triggerLabel' => 'Configure SEO',
+        'render' => 'modal',
+    ],
+]);
+```
+
+**UI Behavior:**
+
+1. A button labeled "Configure SEO" appears instead of inline fields
+2. Clicking the button opens a modal
+3. User edits fields in the modal
+4. Modal closes and data is saved with the main form
+
+---
+
+## Modal Configuration
+
+```php
+$stack->group('advanced', function ($group) {
+    // Fields...
+}, [
+    'label' => 'Advanced Options',
+    'deferred' => true,
+    'ui' => [
+        'triggerLabel' => 'Advanced Options',  // Button text
+        'render' => 'modal',                   // Render mode
+    ],
+]);
+```
+
+### Configuration Options
+
+| Option | Type | Description |
+|--------|------|-------------|
+| `deferred` | bool | Enable modal/deferred mode |
+| `ui.triggerLabel` | string | Text for the trigger button |
+| `ui.render` | string | Render mode: `'modal'`, `'drawer'`, or `'panel'` |
+
+### Render Modes
+
+| Mode | Description |
+|------|-------------|
+| `modal` | Center modal dialog (default) |
+| `drawer` | Slide-in panel from the side |
+| `panel` | Expandable panel below the trigger |
+
+---
+
+## Practical Examples
+
+### 1. Advanced Pricing Configuration
+
+```php
+$stack->group('pricing', function ($group) {
+    $group->field('regular_price', ['type' => 'number', 'label' => 'Regular Price']);
+    $group->field('sale_price', ['type' => 'number', 'label' => 'Sale Price']);
+    $group->field('sale_start', ['type' => 'text', 'label' => 'Sale Start Date']);
+    $group->field('sale_end', ['type' => 'text', 'label' => 'Sale End Date']);
+    $group->field('tax_class', [
+        'type' => 'select',
+        'label' => 'Tax Class',
+        'options' => [
+            ['value' => 'standard', 'label' => 'Standard'],
+            ['value' => 'reduced', 'label' => 'Reduced Rate'],
+            ['value' => 'zero', 'label' => 'Zero Rate'],
+        ],
+    ]);
+    $group->field('enable_wholesale', ['type' => 'toggle', 'label' => 'Enable Wholesale']);
+    $group->field('wholesale_price', [
+        'type' => 'number',
+        'label' => 'Wholesale Price',
+        'conditions' => [
+            ['field' => 'enable_wholesale', 'operator' => '==', 'value' => true],
+        ],
+    ]);
+}, [
+    'label' => 'Pricing',
+    'deferred' => true,
+    'ui' => [
+        'triggerLabel' => 'Configure Pricing',
+        'render' => 'modal',
+    ],
+]);
+```
+
+### 2. Custom Code Injection (Drawer)
+
+```php
+$stack->group('custom_code', function ($group) {
+    $group->field('header_code', [
+        'type' => 'code',
+        'label' => 'Header Code',
+        'description' => 'Added before </head>',
+        'attributes' => ['language' => 'html'],
+    ]);
+    $group->field('footer_code', [
+        'type' => 'code',
+        'label' => 'Footer Code',
+        'description' => 'Added before </body>',
+        'attributes' => ['language' => 'html'],
+    ]);
+    $group->field('custom_css', [
+        'type' => 'code',
+        'label' => 'Custom CSS',
+        'attributes' => ['language' => 'css'],
+    ]);
+    $group->field('custom_js', [
+        'type' => 'code',
+        'label' => 'Custom JavaScript',
+        'attributes' => ['language' => 'javascript'],
+    ]);
+}, [
+    'label' => 'Custom Code',
+    'deferred' => true,
+    'ui' => [
+        'triggerLabel' => 'Add Custom Code',
+        'render' => 'drawer',
+    ],
+]);
+```
+
+### 3. Typography Settings (Drawer)
+
+```php
+$tab->group('typography_settings', function ($group) {
+    $group->field('body_font', ['type' => 'typography', 'label' => 'Body Typography']);
+    $group->field('heading_font', ['type' => 'typography', 'label' => 'Heading Typography']);
+    $group->field('menu_font', ['type' => 'typography', 'label' => 'Menu Typography']);
+    $group->field('button_font', ['type' => 'typography', 'label' => 'Button Typography']);
+}, [
+    'label' => 'Typography Settings',
+    'deferred' => true,
+    'ui' => [
+        'triggerLabel' => 'Customize Typography',
+        'render' => 'drawer',
+    ],
+]);
+```
+
+### 4. SEO Settings for Post Meta
+
+```php
+OptStack::make('post_options')
+    ->forPostMeta(['post', 'page'])
+    ->label('Post Options')
+    ->define(function ($stack) {
+        
+        // Inline fields
+        $stack->field('subtitle', ['type' => 'text', 'label' => 'Subtitle']);
+        
+        // SEO in modal
+        $stack->group('seo', function ($group) {
+            $group->field('title', ['type' => 'text', 'label' => 'SEO Title']);
+            $group->field('description', ['type' => 'textarea', 'label' => 'Meta Description']);
+            $group->field('keywords', ['type' => 'text', 'label' => 'Keywords']);
+            $group->field('canonical', ['type' => 'url', 'label' => 'Canonical URL']);
+            $group->field('og_image', ['type' => 'media', 'label' => 'Social Image']);
+        }, [
+            'label' => 'SEO Settings',
+            'deferred' => true,
+            'ui' => [
+                'triggerLabel' => 'Edit SEO',
+                'render' => 'modal',
+            ],
+        ]);
+        
+    })
+    ->build();
+```
+
+---
+
+## When to Use Modals
+
+### ✅ Use Modals When:
+
+- Group has many fields (5+)
+- Settings are advanced or rarely changed
+- Fields require significant screen space (code editors, typography)
+- You want to reduce visual clutter
+- Configuration is complex but infrequently accessed
+
+### ❌ Avoid Modals When:
+
+- Group has only 1-2 fields
+- Fields are frequently accessed
+- Quick editing is preferred
+- Settings need to be visible at a glance
+
+---
+
+## Combining with Other Features
+
+### Modal with Conditional Fields
+
+```php
+$stack->group('shipping', function ($group) {
+    $group->field('method', [
+        'type' => 'select',
+        'label' => 'Shipping Method',
+        'options' => [
+            ['value' => 'flat', 'label' => 'Flat Rate'],
+            ['value' => 'free', 'label' => 'Free Shipping'],
+            ['value' => 'calculated', 'label' => 'Calculated'],
+        ],
+    ]);
+    
+    $group->field('flat_rate', [
+        'type' => 'number',
+        'label' => 'Flat Rate Amount',
+        'conditions' => [
+            ['field' => 'method', 'operator' => '==', 'value' => 'flat'],
+        ],
+    ]);
+    
+    $group->field('free_threshold', [
+        'type' => 'number',
+        'label' => 'Free Shipping Threshold',
+        'conditions' => [
+            ['field' => 'method', 'operator' => '==', 'value' => 'free'],
+        ],
+    ]);
+}, [
+    'label' => 'Shipping',
+    'deferred' => true,
+    'ui' => ['triggerLabel' => 'Configure Shipping', 'render' => 'modal'],
+]);
+```
+
+### Modal Inside Tab
+
+```php
+$stack->tab('general', function ($tab) {
+    $tab->label('General')->priority(10);
+    
+    // Inline group
+    $tab->group('identity', function ($group) {
+        $group->field('logo', ['type' => 'media']);
+    }, ['label' => 'Site Identity']);
+    
+    // Modal group
+    $tab->group('advanced', function ($group) {
+        $group->field('custom_css', ['type' => 'code']);
+        $group->field('custom_js', ['type' => 'code']);
+    }, [
+        'label' => 'Custom Code',
+        'deferred' => true,
+        'ui' => ['triggerLabel' => 'Add Custom Code', 'render' => 'modal'],
+    ]);
+});
+```
+
+---
+
+## Retrieving Modal Data
+
+Modal data is stored exactly like regular groups:
+
+```php
+use OptStack\OptStack;
+
+// Get field from modal group
+$metaTitle = OptStack::getField('theme_options', 'seo_settings.meta_title', '');
+
+// Get entire modal group data
+$seo = OptStack::getField('theme_options', 'seo_settings', []);
+
+// For post meta
+$seoTitle = OptStack::getField('post_options', 'seo.title', '', $post_id);
+```
+
+---
+
+## Best Practices
+
+### 1. Use Clear Trigger Labels
+
+```php
+// ✅ Good: Descriptive label
+'ui' => ['triggerLabel' => 'Configure SEO Settings']
+
+// ❌ Bad: Vague label
+'ui' => ['triggerLabel' => 'More']
+```
+
+### 2. Choose Appropriate Render Mode
+
+```php
+// Modal: For focused, complete workflows
+'render' => 'modal'
+
+// Drawer: For wide content like code editors
+'render' => 'drawer'
+
+// Panel: For quick edits that don't need full focus
+'render' => 'panel'
+```
+
+### 3. Keep Modal Content Focused
+
+```php
+// ✅ Good: Related fields only
+$stack->group('seo', function ($group) {
+    $group->field('title', [...]);
+    $group->field('description', [...]);
+    $group->field('keywords', [...]);
+}, ['deferred' => true, ...]);
+
+// ❌ Bad: Unrelated fields mixed in
+$stack->group('misc', function ($group) {
+    $group->field('seo_title', [...]);
+    $group->field('theme_color', [...]);
+    $group->field('enable_cache', [...]);
+}, ['deferred' => true, ...]);
+```

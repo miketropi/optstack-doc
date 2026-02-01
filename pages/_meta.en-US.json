@@ -1,6 +1,8 @@
 {
   "index": "Introduction",
   "quickstart": "Quick Start",
+  "options-store": "Storage System",
+  "containers": "Containers",
   "fields": "Fields",
   "about": {
     "title": "About",

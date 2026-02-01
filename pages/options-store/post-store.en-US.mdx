@@ -1,0 +1,424 @@
+---
+title: PostStore
+---
+
+# PostStore
+
+Stores data in the `wp_postmeta` table. Used for custom fields on posts, pages, and custom post types.
+
+---
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **WordPress Table** | `wp_postmeta` |
+| **WordPress Function** | `get_post_meta()` / `update_post_meta()` |
+| **Use Case** | Post meta boxes, product data, page settings |
+| **Object ID Required** | Yes (`$post_id`) |
+
+---
+
+## Stack Definition
+
+```php
+OptStack::make('product_data')
+    ->forPostType('product')
+    ->label('Product Data')
+    ->define(function ($stack) {
+        $stack->field('price', ['type' => 'number', 'label' => 'Price']);
+        $stack->field('sku', ['type' => 'text', 'label' => 'SKU']);
+        
+        $stack->group('inventory', function ($group) {
+            $group->field('stock', ['type' => 'number', 'label' => 'Stock']);
+            $group->field('manage_stock', ['type' => 'toggle', 'label' => 'Manage Stock']);
+        }, ['label' => 'Inventory']);
+    })
+    ->build();
+```
+
+### Multiple Post Types
+
+```php
+OptStack::make('page_settings')
+    ->forPostType(['post', 'page'])  // Multiple post types
+    ->label('Page Settings')
+    ->define(function ($stack) {
+        // ...
+    })
+    ->build();
+```
+
+---
+
+## How Data is Stored
+
+```sql
+-- In wp_postmeta table
+post_id: 123
+meta_key: product_data
+meta_value: a:3:{s:5:"price";d:99.99;s:3:"sku";s:8:"SKU-1234";s:9:"inventory";a:2:{s:5:"stock";i:50;s:12:"manage_stock";b:1;}}
+```
+
+**Unserialized Data:**
+
+```php
+[
+    'price' => 99.99,
+    'sku' => 'SKU-1234',
+    'inventory' => [
+        'stock' => 50,
+        'manage_stock' => true,
+    ]
+]
+```
+
+---
+
+## Constructor
+
+```php
+new PostStore(int $postId, string $metaKey)
+```
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `$postId` | int | The WordPress post ID |
+| `$metaKey` | string | The meta key (stack ID) |
+
+---
+
+## Methods
+
+### Inherited from StoreInterface
+
+```php
+$store->get(string $key, mixed $default = null): mixed
+$store->set(string $key, mixed $value): bool
+$store->delete(string $key): bool
+$store->all(): array
+$store->has(string $key): bool
+$store->setMany(array $values): bool
+$store->replace(array $data): bool
+$store->deleteAll(): bool
+$store->clearCache(): void
+```
+
+### Unique Methods
+
+```php
+// Get the post ID
+$store->getPostId(): int
+
+// Set the post ID (for reusing store instance)
+$store->setPostId(int $postId): self
+
+// Get the meta key
+$store->getMetaKey(): string
+```
+
+---
+
+## Retrieving Data
+
+### Using OptStack Facade (Recommended)
+
+```php
+use OptStack\OptStack;
+
+// Get simple field (requires post ID)
+$price = OptStack::getField('product_data', 'price', 0, $post_id);
+
+// Get nested field (dot notation)
+$stock = OptStack::getField('product_data', 'inventory.stock', 0, $post_id);
+
+// Get all data
+$productData = OptStack::getData('product_data', $post_id);
+```
+
+### In The Loop
+
+```php
+// Inside WordPress loop
+while (have_posts()) {
+    the_post();
+    
+    $price = OptStack::getField('product_data', 'price', 0, get_the_ID());
+    $sku = OptStack::getField('product_data', 'sku', '', get_the_ID());
+    
+    echo "Price: $price, SKU: $sku";
+}
+```
+
+### Using WordPress Functions
+
+```php
+// Get all post meta
+$data = get_post_meta($post_id, 'product_data', true);
+
+// Access specific field
+$price = $data['price'] ?? 0;
+
+// Access nested field
+$stock = $data['inventory']['stock'] ?? 0;
+```
+
+### Direct Store Access
+
+```php
+use OptStack\WordPress\Store\PostStore;
+
+$store = new PostStore($post_id, 'product_data');
+
+// Get value
+$price = $store->get('price', 0);
+
+// Get all data
+$allData = $store->all();
+
+// Check if exists
+if ($store->has('sku')) {
+    // ...
+}
+```
+
+---
+
+## Updating Data
+
+### Using OptStack Facade (Recommended)
+
+```php
+use OptStack\OptStack;
+
+// Update single field
+OptStack::updateField('product_data', 'price', 149.99, $post_id);
+
+// Update nested field
+OptStack::updateField('product_data', 'inventory.stock', 25, $post_id);
+
+// Save multiple fields
+OptStack::saveData('product_data', [
+    'price' => 149.99,
+    'sku' => 'SKU-5678',
+], $post_id);
+```
+
+### Direct Store Access
+
+```php
+$store = new PostStore($post_id, 'product_data');
+
+// Set single value
+$store->set('price', 149.99);
+
+// Set multiple values (efficient)
+$store->setMany([
+    'price' => 149.99,
+    'sku' => 'SKU-5678',
+]);
+```
+
+---
+
+## Automatic Store Binding
+
+PostStore is automatically bound in these scenarios:
+
+### 1. REST API with object_id
+
+```
+GET /wp-json/optstack/v1/stacks/product_data?object_id=123
+```
+
+### 2. Using OptStack::getField() with post ID
+
+```php
+// The $post_id triggers automatic PostStore binding
+$price = OptStack::getField('product_data', 'price', 0, $post_id);
+```
+
+### 3. During save_post Hook
+
+When saving a post in the admin, OptStack automatically binds the PostStore.
+
+---
+
+## Complete Example
+
+### Product Meta Box
+
+```php
+<?php
+use OptStack\OptStack;
+
+add_action('optstack_init', function () {
+    OptStack::make('product_data')
+        ->forPostType('product')
+        ->label('Product Information')
+        ->position('normal')
+        ->priority('high')
+        ->define(function ($stack) {
+            
+            // Pricing Group
+            $stack->group('pricing', function ($group) {
+                $group->field('regular_price', [
+                    'type' => 'number',
+                    'label' => 'Regular Price',
+                    'attributes' => ['prefix' => '$', 'step' => '0.01'],
+                ]);
+                $group->field('sale_price', [
+                    'type' => 'number',
+                    'label' => 'Sale Price',
+                    'attributes' => ['prefix' => '$', 'step' => '0.01'],
+                ]);
+            }, ['label' => 'Pricing', 'layout' => 'box']);
+            
+            // Inventory Group
+            $stack->group('inventory', function ($group) {
+                $group->field('sku', [
+                    'type' => 'text',
+                    'label' => 'SKU',
+                ]);
+                $group->field('manage_stock', [
+                    'type' => 'toggle',
+                    'label' => 'Manage Stock',
+                    'default' => false,
+                ]);
+                $group->field('stock_quantity', [
+                    'type' => 'number',
+                    'label' => 'Stock Quantity',
+                    'conditions' => [
+                        ['field' => 'manage_stock', 'operator' => '==', 'value' => true],
+                    ],
+                ]);
+            }, ['label' => 'Inventory', 'layout' => 'box']);
+            
+            // SEO Group in Modal
+            $stack->group('seo', function ($group) {
+                $group->field('meta_title', ['type' => 'text', 'label' => 'Meta Title']);
+                $group->field('meta_description', ['type' => 'textarea', 'label' => 'Meta Description']);
+            }, [
+                'label' => 'SEO',
+                'deferred' => true,
+                'ui' => ['triggerLabel' => 'Edit SEO', 'render' => 'modal'],
+            ]);
+            
+        })
+        ->build();
+});
+```
+
+### Using in Theme Template
+
+```php
+// single-product.php
+$post_id = get_the_ID();
+
+// Get pricing
+$regular_price = OptStack::getField('product_data', 'pricing.regular_price', 0, $post_id);
+$sale_price = OptStack::getField('product_data', 'pricing.sale_price', 0, $post_id);
+
+// Get inventory
+$sku = OptStack::getField('product_data', 'inventory.sku', '', $post_id);
+$in_stock = OptStack::getField('product_data', 'inventory.stock_quantity', 0, $post_id) > 0;
+
+// Display
+if ($sale_price && $sale_price < $regular_price) {
+    echo '<del>$' . number_format($regular_price, 2) . '</del>';
+    echo '<ins>$' . number_format($sale_price, 2) . '</ins>';
+} else {
+    echo '$' . number_format($regular_price, 2);
+}
+
+echo '<p>SKU: ' . esc_html($sku) . '</p>';
+echo $in_stock ? '<span class="in-stock">In Stock</span>' : '<span class="out-of-stock">Out of Stock</span>';
+```
+
+### Helper Function
+
+```php
+/**
+ * Get product data field.
+ */
+function get_product_field(string $key, mixed $default = null, ?int $post_id = null): mixed
+{
+    $post_id = $post_id ?? get_the_ID();
+    return OptStack::getField('product_data', $key, $default, $post_id);
+}
+
+// Usage
+$price = get_product_field('pricing.regular_price', 0);
+$sku = get_product_field('inventory.sku', 'N/A');
+```
+
+---
+
+## Querying Posts by Meta
+
+Since OptStack stores data as serialized arrays, direct meta queries are limited. For queryable fields, consider using searchable fields (separate meta entries).
+
+### Using get_posts with Meta
+
+```php
+// This won't work well with serialized data
+// $posts = get_posts(['meta_key' => 'product_data', 'meta_value' => ...]);
+
+// Instead, retrieve posts and filter in PHP
+$products = get_posts(['post_type' => 'product', 'posts_per_page' => -1]);
+
+$on_sale = array_filter($products, function ($post) {
+    $sale = OptStack::getField('product_data', 'pricing.sale_price', 0, $post->ID);
+    return $sale > 0;
+});
+```
+
+---
+
+## Best Practices
+
+### 1. Use Logical Grouping
+
+```php
+// ✅ Good - related fields grouped
+$stack->group('pricing', function ($group) {
+    $group->field('regular_price', [...]);
+    $group->field('sale_price', [...]);
+});
+
+// ❌ Bad - flat structure
+$stack->field('regular_price', [...]);
+$stack->field('sale_price', [...]);
+```
+
+### 2. Always Pass Post ID
+
+```php
+// ✅ Good - explicit post ID
+$price = OptStack::getField('product_data', 'price', 0, $post_id);
+
+// ❌ Risky - relies on global post
+$price = OptStack::getField('product_data', 'price', 0, get_the_ID());
+```
+
+### 3. Create Helper Functions
+
+```php
+// Wrap in a helper for cleaner code
+function get_product_meta(string $key, mixed $default = null, ?int $id = null): mixed
+{
+    return OptStack::getField('product_data', $key, $default, $id ?? get_the_ID());
+}
+```
+
+### 4. Use Modals for Complex Data
+
+```php
+// Keep main UI clean, put complex fields in modals
+$stack->group('advanced', function ($group) {
+    // Many fields...
+}, [
+    'deferred' => true,
+    'ui' => ['triggerLabel' => 'Advanced Options'],
+]);
+```

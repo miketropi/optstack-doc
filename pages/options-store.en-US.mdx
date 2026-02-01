@@ -1,0 +1,400 @@
+---
+title: Storage System Overview
+---
+
+# OptStack Storage System
+
+OptStack uses a **Store Adapter pattern** to persist data to WordPress. Each store type wraps a WordPress storage mechanism and provides a consistent API for reading and writing data.
+
+---
+
+## Store Types
+
+| Store | WordPress Table | Use Case |
+|-------|-----------------|----------|
+| **[OptionsStore](/options-store/options-store)** | `wp_options` | Options pages, theme settings, global configurations |
+| **[PostStore](/options-store/post-store)** | `wp_postmeta` | Post meta boxes, product data, page settings |
+| **[TermStore](/options-store/term-store)** | `wp_termmeta` | Category settings, tag metadata, custom taxonomy fields |
+| **[UserStore](/options-store/user-store)** | `wp_usermeta` | User profile extensions, user preferences |
+
+---
+
+## Key Principles
+
+1. **Single Serialized Array**: All stack data is stored as a single serialized array under one key
+2. **Caching**: Stores cache loaded data to minimize database queries
+3. **Transparent**: You typically don't interact with stores directly - OptStack handles it
+4. **Consistent API**: All stores implement the same `StoreInterface`
+
+---
+
+## Architecture
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     OptStack Facade                          │
+│  (OptStack::getField, OptStack::updateField, etc.)          │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                         Stack                                │
+│              (getData, saveData, getField, etc.)            │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│                     StoreInterface                           │
+│        (get, set, delete, all, has, setMany, etc.)          │
+└─────────────────────────────────────────────────────────────┘
+          │              │              │              │
+          ▼              ▼              ▼              ▼
+   OptionsStore    PostStore     TermStore      UserStore
+   (wp_options)   (wp_postmeta) (wp_termmeta)  (wp_usermeta)
+```
+
+---
+
+## StoreInterface
+
+All stores implement the `StoreInterface` contract, providing a consistent API:
+
+```php
+interface StoreInterface
+{
+    // Get a single value
+    public function get(string $key, mixed $default = null): mixed;
+    
+    // Set a single value
+    public function set(string $key, mixed $value): bool;
+    
+    // Delete a single key
+    public function delete(string $key): bool;
+    
+    // Get all data
+    public function all(): array;
+    
+    // Check if key exists
+    public function has(string $key): bool;
+}
+```
+
+### Additional Methods (All Stores)
+
+Beyond the interface, all stores provide these additional methods:
+
+```php
+// Set multiple values at once
+$store->setMany(array $values): bool
+
+// Replace all data (overwrites everything)
+$store->replace(array $data): bool
+
+// Delete all data for this stack
+$store->deleteAll(): bool
+
+// Clear the internal cache
+$store->clearCache(): void
+```
+
+---
+
+## How Data is Stored
+
+### Single Serialized Array Pattern
+
+OptStack stores all stack data as a **single serialized array** under one key. This approach:
+
+- Reduces database queries (one query loads all data)
+- Keeps related data together
+- Simplifies data management
+
+**Example:**
+
+For a stack with this structure:
+
+```php
+$stack->field('site_name', ['type' => 'text']);
+$stack->group('colors', function ($group) {
+    $group->field('primary', ['type' => 'color']);
+    $group->field('secondary', ['type' => 'color']);
+});
+```
+
+Data is stored as:
+
+```php
+[
+    'site_name' => 'My Site',
+    'colors' => [
+        'primary' => '#3b82f6',
+        'secondary' => '#8b5cf6',
+    ]
+]
+```
+
+Which is serialized in the database as:
+
+```
+a:2:{s:9:"site_name";s:7:"My Site";s:6:"colors";a:2:{s:7:"primary";s:7:"#3b82f6";s:9:"secondary";s:7:"#8b5cf6";}}
+```
+
+### Where to Find Stored Data
+
+| Context | WordPress Function | Database Table | Key Column |
+|---------|-------------------|----------------|------------|
+| Options | `get_option()` | `wp_options` | `option_name` |
+| Post Meta | `get_post_meta()` | `wp_postmeta` | `meta_key` |
+| Term Meta | `get_term_meta()` | `wp_termmeta` | `meta_key` |
+| User Meta | `get_user_meta()` | `wp_usermeta` | `meta_key` |
+
+---
+
+## Automatic Store Binding
+
+OptStack automatically binds the appropriate store based on how you define your stack:
+
+| Method | Store | When Bound |
+|--------|-------|------------|
+| `->forOptions()` | OptionsStore | During `optstack_init` |
+| `->forPostType()` | PostStore | On REST API, `OptStack::getField()`, or `save_post` |
+| `->forTaxonomy()` | TermStore | On REST API, `OptStack::getField()`, or term hooks |
+| `->forUser()` | UserStore | On REST API, `OptStack::getField()`, or user hooks |
+
+---
+
+## Direct Store Access
+
+While you typically use the OptStack facade, you can access stores directly:
+
+### Get Store from Stack
+
+```php
+$stack = OptStack::get('theme_options');
+$store = $stack->getStore();
+
+// Direct store operations
+$value = $store->get('site_name', 'Default');
+$store->set('site_name', 'New Name');
+$allData = $store->all();
+```
+
+### Create Store Manually
+
+```php
+use OptStack\WordPress\Store\OptionsStore;
+use OptStack\WordPress\Store\PostStore;
+use OptStack\WordPress\Store\TermStore;
+use OptStack\WordPress\Store\UserStore;
+
+// Options
+$optionsStore = new OptionsStore('my_options');
+$value = $optionsStore->get('key', 'default');
+
+// Post meta
+$postStore = new PostStore($postId, 'my_meta_key');
+$value = $postStore->get('field_name');
+
+// Term meta
+$termStore = new TermStore($termId, 'term_settings');
+$value = $termStore->get('color');
+
+// User meta
+$userStore = new UserStore($userId, 'user_preferences');
+$value = $userStore->get('theme');
+```
+
+---
+
+## Storage Patterns
+
+### Pattern 1: Bulk Updates
+
+When updating multiple fields:
+
+```php
+// Inefficient - multiple database writes
+$store->set('field1', 'value1');
+$store->set('field2', 'value2');
+$store->set('field3', 'value3');
+
+// Efficient - single database write
+$store->setMany([
+    'field1' => 'value1',
+    'field2' => 'value2',
+    'field3' => 'value3',
+]);
+```
+
+### Pattern 2: Replace All Data
+
+When you want to completely replace stored data:
+
+```php
+// This replaces ALL data (be careful!)
+$store->replace([
+    'new_field' => 'new_value',
+]);
+// Previous fields are gone!
+```
+
+### Pattern 3: Conditional Data Access
+
+```php
+$store = $stack->getStore();
+
+if ($store->has('premium_features')) {
+    $features = $store->get('premium_features');
+    // Process features
+}
+```
+
+---
+
+## Performance Considerations
+
+### Caching
+
+All stores implement internal caching:
+
+```php
+// First call - hits database
+$value1 = $store->get('field1');
+
+// Second call - uses cache (no database query)
+$value2 = $store->get('field2');
+
+// Clear cache if needed (forces database reload)
+$store->clearCache();
+```
+
+### Large Data Sets
+
+For stacks with many fields or large values:
+
+1. **Use autoload: false** for options (see [OptionsStore](/options-store/options-store))
+2. **Consider splitting** into multiple stacks
+3. **Use deferred groups** to delay loading UI
+
+---
+
+## Debugging Storage
+
+### View Stored Data
+
+```php
+// Get all data from a stack
+$stack = OptStack::get('theme_options');
+$data = $stack->getData();
+error_log(print_r($data, true));
+
+// Or using WordPress directly
+$data = get_option('theme_options');
+var_dump($data);
+```
+
+### Check Store Type
+
+```php
+$stack = OptStack::get('product_data');
+$store = $stack->getStore();
+
+if ($store instanceof OptionsStore) {
+    echo "Using OptionsStore: " . $store->getOptionName();
+} elseif ($store instanceof PostStore) {
+    echo "Using PostStore for post: " . $store->getPostId();
+} elseif ($store instanceof TermStore) {
+    echo "Using TermStore for term: " . $store->getTermId();
+} elseif ($store instanceof UserStore) {
+    echo "Using UserStore for user: " . $store->getUserId();
+}
+```
+
+### Database Query
+
+Check stored data directly in the database:
+
+```sql
+-- Options
+SELECT * FROM wp_options WHERE option_name = 'theme_options';
+
+-- Post Meta
+SELECT * FROM wp_postmeta WHERE post_id = 123 AND meta_key = 'product_data';
+
+-- Term Meta
+SELECT * FROM wp_termmeta WHERE term_id = 5 AND meta_key = 'category_settings';
+
+-- User Meta
+SELECT * FROM wp_usermeta WHERE user_id = 1 AND meta_key = 'user_profile';
+```
+
+---
+
+## Best Practices
+
+### 1. Use Meaningful Stack IDs
+
+Stack ID becomes the storage key:
+
+```php
+// ✅ Good - descriptive and namespaced
+OptStack::make('mytheme_general_settings');
+OptStack::make('myplugin_product_data');
+
+// ❌ Bad - generic, may conflict
+OptStack::make('settings');
+OptStack::make('data');
+```
+
+### 2. Don't Mix Contexts
+
+One stack = one storage context:
+
+```php
+// ✅ Good - separate stacks for different contexts
+OptStack::make('theme_options')->forOptions();
+OptStack::make('product_data')->forPostType('product');
+
+// ❌ Bad - trying to share stack across contexts
+```
+
+### 3. Use OptStack Facade
+
+Prefer the facade over direct store access:
+
+```php
+// ✅ Good - uses OptStack API
+$price = OptStack::getField('product_data', 'price', 0, $post_id);
+
+// Avoid unless necessary
+$store = new PostStore($post_id, 'product_data');
+$price = $store->get('price', 0);
+```
+
+### 4. Handle Missing Data
+
+Always provide defaults:
+
+```php
+// ✅ Good - always has a fallback
+$color = OptStack::getField('theme_options', 'primary_color', '#3b82f6');
+
+// ❌ Risky - may return null
+$color = OptStack::getField('theme_options', 'primary_color');
+```
+
+### 5. Batch Updates When Possible
+
+```php
+// ✅ Good - single save operation
+OptStack::saveData('theme_options', [
+    'site_name' => 'My Site',
+    'tagline' => 'Just another site',
+    'primary_color' => '#3b82f6',
+]);
+
+// Less efficient - multiple save operations
+OptStack::updateField('theme_options', 'site_name', 'My Site');
+OptStack::updateField('theme_options', 'tagline', 'Just another site');
+OptStack::updateField('theme_options', 'primary_color', '#3b82f6');
+```

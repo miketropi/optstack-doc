@@ -83,31 +83,31 @@ $stack->field('example_field', [
 OptStack supports the following field types. Click each link for detailed documentation:
 
 ### Input Fields
-- **[text](./fields/text.md)** - Single-line text input
-- **[textarea](./fields/textarea.md)** - Multi-line text input
-- **[number](./fields/number.md)** - Numeric input with min/max/step
-- **[email](./fields/email.md)** - Email address input
-- **[url](./fields/url.md)** - URL input with validation
+- **[text](/fields/Types/text)** - Single-line text input
+- **[textarea](/fields/Types/textarea)** - Multi-line text input
+- **[number](/fields/Types/number)** - Numeric input with min/max/step
+- **[email](/fields/Types/email)** - Email address input
+- **[url](/fields/Types/url)** - URL input with validation
 
 ### Selection Fields
-- **[select](./fields/select.md)** - Dropdown select menu
-- **[radio](./fields/radio.md)** - Radio button group
-- **[radio-image](./fields/radio-image.md)** - Visual radio buttons with images
-- **[checkbox-group](./fields/checkbox-group.md)** - Multiple checkbox selection
-- **[toggle](./fields/toggle.md)** - On/off switch
+- **[select](/fields/Types/select)** - Dropdown select menu
+- **[radio](/fields/Types/radio)** - Radio button group
+- **[radio-image](/fields/Types/radio-image)** - Visual radio buttons with images
+- **[checkbox-group](/fields/Types/checkbox-group)** - Multiple checkbox selection
+- **[toggle](/fields/Types/toggle)** - On/off switch
 
 ### Visual Fields
-- **[color](./fields/color.md)** - Color picker with optional alpha
-- **[media](./fields/media.md)** - WordPress media library picker
-- **[range](./fields/range.md)** - Slider range input
+- **[color](/fields/Types/color)** - Color picker with optional alpha
+- **[media](/fields/Types/media)** - WordPress media library picker
+- **[range](/fields/Types/range)** - Slider range input
 
 ### Rich Content Fields
-- **[wysiwyg](./fields/wysiwyg.md)** - WordPress visual editor
-- **[code](./fields/code.md)** - Code editor with syntax highlighting
-- **[typography](./fields/typography.md)** - Complete typography controls
+- **[wysiwyg](/fields/Types/wysiwyg)** - WordPress visual editor
+- **[code](/fields/Types/code)** - Code editor with syntax highlighting
+- **[typography](/fields/Types/typography)** - Complete typography controls
 
 ### Advanced Fields
-- **[visual_builder](./fields/visual-builder.md)** - Drag-and-drop visual content builder
+- **[visual_builder](/fields/Types/visual-builder)** - Drag-and-drop visual content builder
 
 ---
 
@@ -303,9 +303,110 @@ OptStack::updateField('theme_options', 'colors.primary', '#3b82f6');
 
 ---
 
+### Creating a Theme Helper Function (Recommended)
+
+For cleaner code in your theme, create a wrapper function that uses `OptStack::getField()`:
+
+```php
+use OptStack\OptStack;
+
+/**
+ * Get a theme option value.
+ *
+ * @param string $key     Field key (supports dot notation for nested fields)
+ * @param mixed  $default Default value if not found
+ * @return mixed
+ */
+function mytheme_option(string $key, mixed $default = null): mixed
+{
+    return OptStack::getField('theme_options', $key, $default);
+}
+
+/**
+ * Get a post meta value.
+ *
+ * @param string   $key     Field key (supports dot notation)
+ * @param mixed    $default Default value if not found
+ * @param int|null $post_id Post ID (defaults to current post)
+ * @return mixed
+ */
+function mytheme_post_meta(string $key, mixed $default = null, ?int $post_id = null): mixed
+{
+    $post_id = $post_id ?? get_the_ID();
+    return OptStack::getField('post_options', $key, $default, $post_id);
+}
+```
+
+#### Usage in Templates
+
+```php
+// In header.php
+$logo = mytheme_option('identity.site_logo');
+$sticky_header = mytheme_option('header_layout.sticky', true);
+
+if ($logo) {
+    echo '<img src="' . esc_url(wp_get_attachment_url($logo)) . '" alt="Logo">';
+}
+
+// In single.php
+$show_author = mytheme_post_meta('display.show_author', true);
+$custom_title = mytheme_post_meta('seo.custom_title', get_the_title());
+```
+
+#### Complete Theme Functions Example
+
+```php
+/**
+ * Theme helper functions for OptStack
+ * Add this to your theme's functions.php
+ */
+
+use OptStack\OptStack;
+
+/**
+ * Get theme option with caching.
+ */
+function mytheme_option(string $key, mixed $default = null): mixed
+{
+    static $cache = [];
+    
+    if (!isset($cache[$key])) {
+        $cache[$key] = OptStack::getField('theme_options', $key, $default);
+    }
+    
+    return $cache[$key];
+}
+
+/**
+ * Update a theme option.
+ */
+function mytheme_update_option(string $key, mixed $value): bool
+{
+    return OptStack::updateField('theme_options', $key, $value);
+}
+
+/**
+ * Check if a theme option is enabled (for toggles).
+ */
+function mytheme_is_enabled(string $key): bool
+{
+    return (bool) mytheme_option($key, false);
+}
+
+// Usage examples
+if (mytheme_is_enabled('header_layout.sticky')) {
+    // Add sticky header class
+}
+
+$primary_color = mytheme_option('colors.primary', '#3b82f6');
+$font_size = mytheme_option('typography.body_font.fontSize', 16);
+```
+
+---
+
 ### Direct WordPress Functions (Alternative)
 
-You can also use native WordPress functions directly:
+You can also use native WordPress functions directly (without OptStack helpers):
 
 #### For Options Pages
 
@@ -320,7 +421,9 @@ $value = $options['field_id'] ?? 'default';
 $grouped_value = $options['group_id']['field_id'] ?? 'default';
 ```
 
-#### Custom Dot Notation Helper
+#### Manual Dot Notation Helper
+
+If you prefer not to use `OptStack::getField()`, here's a standalone helper:
 
 ```php
 function my_option(string $key, mixed $default = null): mixed

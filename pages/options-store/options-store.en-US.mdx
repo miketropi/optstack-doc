@@ -1,0 +1,365 @@
+---
+title: OptionsStore
+---
+
+# OptionsStore
+
+Stores data in the `wp_options` table. Used for global site settings, theme options, and plugin settings.
+
+---
+
+## Overview
+
+| Property | Value |
+|----------|-------|
+| **WordPress Table** | `wp_options` |
+| **WordPress Function** | `get_option()` / `update_option()` |
+| **Use Case** | Options pages, theme settings, global configurations |
+| **Object ID Required** | No |
+
+---
+
+## Stack Definition
+
+```php
+OptStack::make('theme_options')
+    ->forOptions()
+    ->label('Theme Options')
+    ->menuParent('themes.php')
+    ->define(function ($stack) {
+        $stack->field('site_name', ['type' => 'text', 'label' => 'Site Name']);
+        $stack->field('primary_color', ['type' => 'color', 'label' => 'Primary Color']);
+        
+        $stack->group('social', function ($group) {
+            $group->field('facebook', ['type' => 'url', 'label' => 'Facebook']);
+            $group->field('twitter', ['type' => 'url', 'label' => 'Twitter']);
+        }, ['label' => 'Social Links']);
+    })
+    ->build();
+```
+
+---
+
+## How Data is Stored
+
+```sql
+-- In wp_options table
+option_name: theme_options
+option_value: a:3:{s:9:"site_name";s:7:"My Site";s:13:"primary_color";s:7:"#3b82f6";s:6:"social";a:2:{s:8:"facebook";s:25:"https://facebook.com/...";s:7:"twitter";s:24:"https://twitter.com/...";}}
+```
+
+**Unserialized Data:**
+
+```php
+[
+    'site_name' => 'My Site',
+    'primary_color' => '#3b82f6',
+    'social' => [
+        'facebook' => 'https://facebook.com/...',
+        'twitter' => 'https://twitter.com/...',
+    ]
+]
+```
+
+---
+
+## Constructor
+
+```php
+new OptionsStore(string $optionName, bool $autoload = true)
+```
+
+| Parameter | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `$optionName` | string | - | The option name (stack ID) |
+| `$autoload` | bool | `true` | Whether WordPress should autoload this option |
+
+---
+
+## Methods
+
+### Inherited from StoreInterface
+
+```php
+$store->get(string $key, mixed $default = null): mixed
+$store->set(string $key, mixed $value): bool
+$store->delete(string $key): bool
+$store->all(): array
+$store->has(string $key): bool
+$store->setMany(array $values): bool
+$store->replace(array $data): bool
+$store->deleteAll(): bool
+$store->clearCache(): void
+```
+
+### Unique Methods
+
+```php
+// Get the option name
+$store->getOptionName(): string
+```
+
+---
+
+## Retrieving Data
+
+### Using OptStack Facade (Recommended)
+
+```php
+use OptStack\OptStack;
+
+// Get simple field
+$siteName = OptStack::getField('theme_options', 'site_name', 'Default Site');
+
+// Get nested field (dot notation)
+$facebook = OptStack::getField('theme_options', 'social.facebook', '');
+
+// Get all data
+$allOptions = OptStack::getData('theme_options');
+```
+
+### Using WordPress Functions
+
+```php
+// Get all options
+$options = get_option('theme_options', []);
+
+// Access specific field
+$siteName = $options['site_name'] ?? 'Default Site';
+
+// Access nested field
+$facebook = $options['social']['facebook'] ?? '';
+```
+
+### Direct Store Access
+
+```php
+use OptStack\WordPress\Store\OptionsStore;
+
+$store = new OptionsStore('theme_options');
+
+// Get value
+$siteName = $store->get('site_name', 'Default');
+
+// Get all data
+$allData = $store->all();
+
+// Check if exists
+if ($store->has('primary_color')) {
+    // ...
+}
+```
+
+---
+
+## Updating Data
+
+### Using OptStack Facade (Recommended)
+
+```php
+use OptStack\OptStack;
+
+// Update single field
+OptStack::updateField('theme_options', 'site_name', 'New Site Name');
+
+// Update nested field
+OptStack::updateField('theme_options', 'social.facebook', 'https://facebook.com/newpage');
+
+// Save multiple fields
+OptStack::saveData('theme_options', [
+    'site_name' => 'New Site',
+    'primary_color' => '#10b981',
+]);
+```
+
+### Direct Store Access
+
+```php
+$store = new OptionsStore('theme_options');
+
+// Set single value
+$store->set('site_name', 'New Name');
+
+// Set multiple values (efficient)
+$store->setMany([
+    'site_name' => 'New Site',
+    'primary_color' => '#10b981',
+]);
+
+// Replace all data
+$store->replace([
+    'site_name' => 'Fresh Start',
+]);
+```
+
+---
+
+## Autoload Option
+
+The `autoload` parameter controls whether WordPress loads this option on every page:
+
+### Autoload TRUE (Default)
+
+```php
+// Data loaded on EVERY page load
+$store = new OptionsStore('theme_options', true);
+```
+
+**Best for:**
+- Frequently accessed settings
+- Theme options used on every page
+- Small data sets
+
+**Trade-off:** Memory usage on every request
+
+### Autoload FALSE
+
+```php
+// Data loaded only when accessed
+$store = new OptionsStore('import_export_history', false);
+```
+
+**Best for:**
+- Rarely used settings
+- Large data sets
+- Admin-only options
+- Import/export data
+
+**Trade-off:** Extra query when first accessed
+
+### Setting Autoload in Stack
+
+```php
+// Currently, autoload is set via the store
+// For forOptions(), autoload defaults to true
+
+// For custom control, use direct store:
+$stack = OptStack::get('my_options');
+$stack->setStore(new OptionsStore('my_options', false));
+```
+
+---
+
+## Complete Example
+
+### Theme Options Page
+
+```php
+<?php
+use OptStack\OptStack;
+
+add_action('optstack_init', function () {
+    OptStack::make('theme_options')
+        ->forOptions()
+        ->menuParent('themes.php')
+        ->menuIcon('dashicons-admin-appearance')
+        ->label('Theme Options')
+        ->description('Configure your theme settings')
+        ->define(function ($stack) {
+            
+            $stack->tab('general', function ($tab) {
+                $tab->label('General')->priority(10);
+                
+                $tab->group('identity', function ($group) {
+                    $group->field('site_logo', [
+                        'type' => 'media',
+                        'label' => 'Site Logo',
+                        'attributes' => ['allowedTypes' => ['image']],
+                    ]);
+                    $group->field('site_tagline', [
+                        'type' => 'text',
+                        'label' => 'Tagline',
+                    ]);
+                }, ['label' => 'Site Identity', 'layout' => 'box']);
+            });
+            
+            $stack->tab('colors', function ($tab) {
+                $tab->label('Colors')->priority(20);
+                
+                $tab->field('primary_color', [
+                    'type' => 'color',
+                    'label' => 'Primary Color',
+                    'default' => '#3b82f6',
+                ]);
+                $tab->field('secondary_color', [
+                    'type' => 'color',
+                    'label' => 'Secondary Color',
+                    'default' => '#8b5cf6',
+                ]);
+            });
+            
+        })
+        ->build();
+});
+```
+
+### Using the Options in Theme
+
+```php
+// In functions.php
+function mytheme_option(string $key, mixed $default = null): mixed
+{
+    return OptStack::getField('theme_options', $key, $default);
+}
+
+// In header.php
+$logo = mytheme_option('identity.site_logo');
+$tagline = mytheme_option('identity.site_tagline', get_bloginfo('description'));
+
+if ($logo) {
+    echo '<img src="' . esc_url(wp_get_attachment_url($logo)) . '" alt="Logo">';
+}
+
+// In style output
+$primaryColor = mytheme_option('primary_color', '#3b82f6');
+echo '<style>:root { --primary-color: ' . esc_attr($primaryColor) . '; }</style>';
+```
+
+---
+
+## Best Practices
+
+### 1. Namespace Your Option Names
+
+```php
+// ✅ Good - prefixed with theme/plugin name
+OptStack::make('mytheme_options');
+OptStack::make('myplugin_settings');
+
+// ❌ Bad - generic names may conflict
+OptStack::make('options');
+OptStack::make('settings');
+```
+
+### 2. Use Autoload Wisely
+
+```php
+// Frequently accessed - autoload TRUE (default)
+new OptionsStore('theme_options', true);
+
+// Rarely accessed - autoload FALSE
+new OptionsStore('backup_history', false);
+new OptionsStore('migration_log', false);
+```
+
+### 3. Provide Sensible Defaults
+
+```php
+// Always provide defaults when retrieving
+$color = OptStack::getField('theme_options', 'primary_color', '#3b82f6');
+$enabled = OptStack::getField('theme_options', 'feature_enabled', false);
+```
+
+### 4. Group Related Settings
+
+```php
+// ✅ Good - logical grouping
+$stack->group('typography', function ($group) {
+    $group->field('body_font', [...]);
+    $group->field('heading_font', [...]);
+});
+
+// ❌ Bad - flat structure for related fields
+$stack->field('body_font', [...]);
+$stack->field('heading_font', [...]);
+```
